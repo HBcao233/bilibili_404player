@@ -737,7 +737,7 @@
       minute: "2-digit",
       second: "2-digit",
     })
-    return formatter.format(d).replace('/', '-')
+    return formatter.format(d).replaceAll('/', '-')
   }
   function formatTime(t) {
     let s = Math.floor(t % 60);
