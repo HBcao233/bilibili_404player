@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 404 刷视频
 // @namespace    http://tampermonkey.net/
-// @version      2024.12.07.1
+// @version      2024.12.07.2
 // @description  在 Bilibili 404页面刷视频
 // @author       HBcao233
 // @match        http*://*.bilibili.com/*
@@ -1769,9 +1769,11 @@
    */
   async function getCurrentVideo() {
     const v = videos[currentIndex];
-    const video = videoInfos[v.goto + '_' + v.id];
-    if (video) return video;
-    return await getInfo(v.id, v.cid);
+    const v1 = videoInfos[v.goto + '_' + v.id];
+    if (v1) return v1;
+    const v2 = await getInfo(v.id, v.cid);
+    videoInfos[v.goto + '_' + v.id] = v2;
+    return v2;
   }
 
   /**
