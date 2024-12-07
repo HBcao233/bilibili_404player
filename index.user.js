@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 404 刷视频
 // @namespace    http://tampermonkey.net/
-// @version      2024.12.05.1
+// @version      2024.12.07.1
 // @description  在 Bilibili 404页面刷视频
 // @author       HBcao233
 // @match        http*://*.bilibili.com/*
@@ -1145,9 +1145,8 @@
         if (progress_is_mousedown) return;
         const audio_buffered = t.buffered.length > 0 ? t.buffered.end(t.buffered.length - 1) : 0;
         const video_buffered = videoElement.buffered.length > 0 ? videoElement.buffered.end(videoElement.buffered.length - 1) : 0;
-        const duration = video.timelength / 1000;
-        const buffered = Math.min(audio_buffered, video_buffered) / duration;
-        const current = t.currentTime / duration;
+        const buffered = Math.min(audio_buffered, video_buffered) / videoElement.duration;
+        const current = t.currentTime / videoElement.duration;
         if (!document.querySelector('.bpx-player-progress .schedule')) return;
         const total_px = document.querySelector('.bpx-player-progress .schedule').clientWidth;
         document.querySelector('.bpx-player-progress .buffer').style.transform = 'scaleX(' + buffered + ')';
