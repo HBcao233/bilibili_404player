@@ -873,7 +873,7 @@
       credentials: 'include',
     });
     const res = await r.json();
-    return res.data.dash;
+    return res.data;
   }
   async function getRelation(aid) {
     const r = await fetch('https://api.bilibili.com/x/web-interface/archive/relation?aid=' + aid, {
@@ -907,7 +907,10 @@
     const result = res.data;
     if (!result) return;
     result.relation = await getRelation(aid);
-    result.dash = await getPlayUrl(result.bvid, result.cid);
+    const playinfo = await getPlayUrl(result.bvid, result.cid)
+    result.dash = playinfo.dash;
+    result.timelength = playinfo.timelength;
+    result.support_formats = playinfo.support_formats;
     const res1 = await getPlayerInfo(aid, cid);
     if (res1) result.last_play_time = res1.last_play_time;
     const urls = selectQuality(result);
@@ -1073,52 +1076,65 @@
      * 视频播放器
      */
     let progress_is_mousedown = false;
+    let canplay_times = 0;
+    const canplay_func = () => {
+      document.querySelector('.control-btn.time .duration').innerHTML = formatTime(audioElement.duration);
+      document.querySelector('.bpx-player-loading-panel').classList.remove('bpx-state-loading');
+      audioElement.play();
+    }
+    const canplay_wrap = (e) => {
+      e.target.canplay_times = (e.target.canplay_times || 0) + 1;
+      if (audioElement.canplay_times == 1 && videoElement.canplay_times == 1) canplay_func();
+    }
     audioElement = tag('audio', {
       attrs: {
         preload: 'auto',
         src: video.audio_url,
       }
+    }, (t) => {
+      const lt = video.last_play_time || video.currentTime;
+      if (lt && lt < video.duration * 0.9 && lt < video.duration - 5) {
+        audioElement.currentTime = lt;
+      }
+
+      t.addEventListener('canplay', canplay_wrap);
+      t.addEventListener('ended', nextVideo);
+      t.addEventListener('play', () => videoElement.play());
+      t.addEventListener('pause', () => videoElement.pause());
+      t.addEventListener('seeking', () => videoElement.currentTime = t.currentTime);
+      t.addEventListener('ratechange', () => videoElement.playbackRate = t.playbackRate);
+      t.addEventListener('timeupdate', () => {
+        if (progress_is_mousedown) return;
+        const audio_buffered = t.buffered.length > 0 ? t.buffered.end(t.buffered.length - 1) : 0;
+        const video_buffered = videoElement.buffered.length > 0 ? videoElement.buffered.end(videoElement.buffered.length - 1) : 0;
+        const duration = video.timelength / 1000;
+        const buffered = Math.min(audio_buffered, video_buffered) / duration;
+        const current = t.currentTime / duration;
+        if (!document.querySelector('.bpx-player-progress .schedule')) return;
+        const total_px = document.querySelector('.bpx-player-progress .schedule').clientWidth;
+        document.querySelector('.bpx-player-progress .buffer').style.transform = 'scaleX(' + buffered + ')';
+        document.querySelector('.bpx-player-progress .current').style.transform = 'scaleX(' + current + ')';
+        document.querySelector('.bpx-player-progress .thumb').style.transform = 'translateX(' + current * total_px + 'px)';
+        document.querySelector('.control-btn.time .current').innerHTML = formatTime(t.currentTime);
+      });
+      t.addEventListener('error', async () => {
+        const video = (await getCurrentVideo());
+        const error_times = (video.audio_error_times || 0) + 1;
+        video.audio_error_times = error_times;
+        console.warn('音频播放失败 error_times: ' + error_times + ', 尝试切换备用链接');
+        const d = selectQuality(video, error_times)
+        video.audio_url = d[1];
+        t.src = d[1];
+      })
     });
-    audioElement.addEventListener('error', async () => {
-      const video = (await getCurrentVideo());
-      const error_times = (video.audio_error_times || 0) + 1;
-      video.audio_error_times = error_times;
-      console.warn('音频播放失败 error_times: ' + error_times + ', 尝试切换备用链接');
-      const d = selectQuality(video, error_times)
-      video.audio_url = d[1];
-      audioElement.src = d[1];
-    })
     videoElement = tag('video', {
       attrs: {
         preload: 'auto',
         src: video.video_url,
       }
     }, (t) => {
-      const lt = video.last_play_time || video.currentTime;
-      if (lt && lt < video.duration * 0.9 && lt < video.duration - 5) {
-        videoElement.currentTime = lt;
-        audioElement.currentTime = lt;
-      }
-
-      t.addEventListener('canplay', () => {
-        document.querySelector('.control-btn.time .duration').innerHTML = formatTime(t.duration);
-        document.querySelector('.bpx-player-loading-panel').classList.remove('bpx-state-loading');
-        videoElement.play();
-        audioElement.play();
-      });
-      t.addEventListener('timeupdate', (e) => {
-        if (progress_is_mousedown) return;
-        const buffered = e.target.buffered.length > 0 ? e.target.buffered.end(e.target.buffered.length - 1) / e.target.duration : 0;
-        const current = e.target.currentTime / e.target.duration;
-        if (!document.querySelector('.bpx-player-progress .schedule')) return;
-        const total_px = document.querySelector('.bpx-player-progress .schedule').clientWidth;
-        document.querySelector('.bpx-player-progress .buffer').style.transform = 'scaleX(' + buffered + ')';
-        document.querySelector('.bpx-player-progress .current').style.transform = 'scaleX(' + current + ')';
-        document.querySelector('.bpx-player-progress .thumb').style.transform = 'translateX(' + current * total_px + 'px)';
-        document.querySelector('.control-btn.time .current').innerHTML = formatTime(e.target.currentTime);
-      });
+      t.addEventListener('canplay', canplay_wrap);
       t.addEventListener('click', videoClick);
-      t.addEventListener('ended', nextVideo);
       t.addEventListener('error', async () => {
         const video = (await getCurrentVideo());
         const error_times = (video.video_error_times || 0) + 1;
@@ -1129,9 +1145,9 @@
         videoElement.src = d[0];
       })
       let waiting = false;
-      let flag = false;
+      let no_buffing = false;
       t.addEventListener('waiting', async () => {
-        if (flag) return;
+        if (no_buffing) return;
         if (!waiting) {
           waiting = true;
           playerElement.classList.add('bpx-state-buff');
@@ -1140,17 +1156,15 @@
       t.addEventListener('playing', async () => {
         if (waiting) {
           waiting = false;
-          audioElement.currentTime = videoElement.currentTime;
           playerElement.classList.remove('bpx-state-buff');
         }
-      })
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && !videoElement.paused) {
-          flag = true;
+        if (no_buffing) return;
+        if (!videoElement.paused && !videoElement.seeking && Math.abs(videoElement.currentTime - audioElement.currentTime) > 0.01) {
+          no_buffing = true;
           videoElement.currentTime = audioElement.currentTime;
-          setTimeout(() => { flag = false }, 50)
+          setTimeout(() => { no_buffing = false }, 50)
         }
-      });
+      })
     });
     /**
      * 用于生成预览图的 video element
@@ -1339,7 +1353,6 @@
                       });
                       document.addEventListener('mouseup', (e) => {
                         if (progress_is_mousedown) {
-                          videoElement.currentTime = currentTime;
                           audioElement.currentTime = currentTime;
                         }
                         if (!progress_is_mousedown) t.classList.remove('active');
@@ -1728,6 +1741,8 @@
     if (!inited) {
       return await init(video);
     }
+    audioElement.canplay_times = 0;
+    videoElement.canplay_times = 0;
     playerElement.classList.remove('bpx-state-paused');
     document.querySelector('.up-avatar-wrap').setAttribute('href', 'https://space.bilibili.com/' + video.owner.mid);
     document.querySelector('.up-detail-top').setAttribute('href', 'https://space.bilibili.com/' + video.owner.mid);
@@ -1748,7 +1763,6 @@
 
     const lt = video.last_play_time || video.currentTime;
     if (lt && lt < video.duration * 0.9 && lt < video.duration - 5) {
-      videoElement.currentTime = lt;
       audioElement.currentTime = lt;
     }
 
@@ -1838,11 +1852,9 @@
   function videoClick() {
     if (videoElement.paused) {
       audioElement.play();
-      videoElement.play();
       playerElement.classList.remove('bpx-state-paused');
     } else {
       audioElement.pause();
-      videoElement.pause();
       playerElement.classList.add('bpx-state-paused');
     }
   }
@@ -1933,7 +1945,6 @@
     playerElement.classList.add('hover')
     if (!forwarding) forward_idx = setTimeout(() => {
       forwarding = true;
-      videoElement.playbackRate = (playerElement.currentRate || 1) * 3;
       audioElement.playbackRate = (playerElement.currentRate || 1) * 3;
       document.querySelector('.bpx-player-playrate-hint').style.removeProperty('display');
     }, 500);
@@ -1941,13 +1952,10 @@
   function videoForwardEnd() {
     clearTimeout(forward_idx);
     if (!forwarding) {
-      const newTime = videoElement.currentTime + 5 > videoElement.duration ? videoElement.duration : videoElement.currentTime + 5;
-      videoElement.currentTime = newTime;
-      audioElement.currentTime = newTime;
+      audioElement.currentTime = videoElement.currentTime + 5 > videoElement.duration ? videoElement.duration : videoElement.currentTime + 5;
     }
     forwarding = false;
     document.querySelector('.bpx-player-playrate-hint').style.display = 'none';
-    videoElement.playbackRate = playerElement.currentRate || 1;
     audioElement.playbackRate = playerElement.currentRate || 1;
   }
 
@@ -1960,16 +1968,12 @@
     playerElement.classList.add('hover')
     if (!backwarding) backward_idx = setInterval(() => {
       backwarding = true
-      const newTime = videoElement.currentTime - 1 > 0 ? videoElement.currentTime - 1 : 0;
-      videoElement.currentTime = newTime;
-      audioElement.currentTime = newTime;
-    }, 500);
+      if (backwarding) audioElement.currentTime = videoElement.currentTime - 1 > 0 ? videoElement.currentTime - 1 : 0;
+    }, 200);
   }
   function videoBackwardEnd() {
     if (!backwarding) {
-      const newTime = videoElement.currentTime - 5 > 0 ? videoElement.currentTime - 5 : 0;
-      videoElement.currentTime = newTime;
-      audioElement.currentTime = newTime;
+      audioElement.currentTime = videoElement.currentTime - 5 > 0 ? videoElement.currentTime - 5 : 0;
     }
     clearInterval(backward_idx);
     backwarding = false
@@ -1986,11 +1990,17 @@
         break;
       // 快退
       case 'ArrowLeft':
+        e.preventDefault();
         videoBackwardStart();
         break;
       // 快进
       case 'ArrowRight':
+        e.preventDefault();
         videoForwardStart();
+        break;
+      case 'ArrowUp':
+      case 'ArrowDown':
+        e.preventDefault();
         break;
     }
   })
@@ -2000,11 +2010,13 @@
       // 上一条
       case 'BracketLeft':
       case 'ArrowUp':
+        e.preventDefault();
         await previousVideo();
         break;
       // 下一条
       case 'BracketRight':
       case 'ArrowDown':
+        e.preventDefault();
         await nextVideo();
         break;
       // 点赞
@@ -2023,10 +2035,12 @@
         break;
       // 快退
       case 'ArrowLeft':
+        e.preventDefault();
         videoBackwardEnd();
         break;
       // 快进
       case 'ArrowRight':
+        e.preventDefault();
         videoForwardEnd();
         break;
     }
@@ -2036,7 +2050,6 @@
     container = document.querySelector('.error-container');
     if (!container) return;
     container.innerHTML = '';
-    document.body.style.overflow = 'hidden';
     document.title = '404 刷视频'
     container.style.cssText = 'margin-top: 0; margin-bottom: 0; padding: 10px 40px; width: 740px; height: ' + (window.innerHeight - document.getElementById('biliMainHeader').clientHeight) + 'px'
     let style = document.createElement('style');
