@@ -967,16 +967,12 @@
             }),
             tag('div', {
               class: 'up-detail-down',
-              children: [
-                '[',
-                tag('a', {
+              children: tag('a', {
                   class: 'up-detail-bvid',
                   style: 'color: #00AEEC',
                   attrs: { href: '/video/' + video.bvid, target: '_blank' },
                   innerHTML: video.bvid
                 }),
-                tag('span', { style: 'margin-right: 8px', innerHTML: ']' }),
-              ]
             }),
           ]
         })
