@@ -735,6 +735,7 @@
       display: flex;
       align-items: center;
       width: 92px;
+      height: 28px;
       transition: all .3s;
       font-size: 13px;
       font-weight: 500;
@@ -749,6 +750,23 @@
       width: 28px;
       height: 28px;
       margin-right: 8px;
+    }
+
+    .video-desc-container {
+      margin: 16px 0;
+    }
+    .video-desc-container .basic-desc-info {
+      white-space: pre-line;
+      letter-spacing: 0;
+      color: var(--text1, #18191c);
+      font-size: 15px;
+      line-height: 24px;
+      overflow: hidden;
+      word-break: break-all;
+      line-break: anywhere;
+    }
+    .video-desc-container .basic-desc-info a {
+      color: var(--brand_blue, #00aeec);
     }
 `
   String.prototype.rsplit = function (sep, maxsplit) {
@@ -974,6 +992,26 @@
     }
     func && func(newElement)
     return newElement;
+  }
+
+  /**
+   * 视频简介实体化
+   * @param {Object} desc_v2 
+   * @returns {Array<HTMLElement>}
+   */
+  function parseDesc(desc_v2) {
+    return !desc_v2 ? [] : desc_v2.map((i) => {
+      switch (i.type) {
+        case 2:
+          return tag('a', { attrs: { target: '_blank', href: '//space.bilibili.com/' + i.biz_id }, innerHTML: i.raw_text })
+        case 1:
+        default:
+          if (i.raw_text.startsWith('BV') && i.raw_text.length < 20) {
+            return tag('a', { attrs: { target: '_blank', href: '//www.bilibili.com/video/' + i.raw_text }, innerHTML: i.raw_text });
+          }
+          return tag('span', { class: 'desc-info-text', innerHTML: i.raw_text })
+      }
+    });
   }
 
   /**
@@ -1714,6 +1752,16 @@
         ]
       })
     }));
+
+    /**
+     * 视频简介
+     */
+    container.appendChild(tag('div', {
+      id: 'v_desc', class: 'video-desc-container', children: tag('div', {
+        class: 'basic-desc-info',
+        children: parseDesc(video.desc_v2)
+      })
+    }))
   }
 
   /**
@@ -1775,6 +1823,9 @@
     if (video.relation.coin) document.querySelector('.video-toolbar .coin').classList.add('on');
     if (video.relation.favorite) document.querySelector('.video-toolbar .favorite').classList.add('on');
     if (video.relation.share) document.querySelector('.video-toolbar .share').classList.add('on');
+
+    document.querySelector('#v_desc .basic-desc-info').innerHTML = '';
+    parseDesc(video.desc_v2).forEach((i) => document.querySelector('#v_desc .basic-desc-info').appendChild(i));
   }
 
   let last_rcmded_index = -1;
@@ -2051,7 +2102,7 @@
     if (!container) return;
     container.innerHTML = '';
     document.title = '404 刷视频'
-    container.style.cssText = 'margin-top: 0; margin-bottom: 0; padding: 10px 40px; width: 740px; height: ' + (window.innerHeight - document.getElementById('biliMainHeader').clientHeight) + 'px'
+    container.style.cssText = 'margin-top: 0; margin-bottom: 0; padding: 10px 40px; width: 740px'
     let style = document.createElement('style');
     style.innerHTML = styles
     document.body.after(style);
