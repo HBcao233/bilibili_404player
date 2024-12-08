@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 404 刷视频
 // @namespace    http://tampermonkey.net/
-// @version      2024.12.08.0
+// @version      2024.12.08.1
 // @description  在 Bilibili 404页面刷视频
 // @author       HBcao233
 // @match        http*://*.bilibili.com/*
@@ -972,9 +972,6 @@
     #video_url = '';
     #audio_url = '';
 
-    audio_error_times = 0;
-    video_error_times = 0;
-
     // 进度条被按下
     progress_is_mousedown = false;
     // 鼠标指向进度条 新时间
@@ -1172,8 +1169,8 @@
       });
       this.audioElement.addEventListener('error', () => {
         if (!this.has_audio) return;
-        this.audio_error_times = (this.audio_error_times || 0) + 1;
-        console.warn('音频播放失败 error_times: ' + this.audio_error_times + ', 尝试切换备用链接');
+        this.video_info.audio_error_times = (this.video_info.audio_error_times || 0) + 1;
+        console.warn('音频播放失败 error_times: ' + this.video_info.audio_error_times + ', 尝试切换备用链接');
         this.audio_url = chooseQuality(this.video_info)[1];
       });
 
@@ -1207,8 +1204,8 @@
         this.progress_render();
       });
       this.videoElement.addEventListener('error', async () => {
-        this.video_error_times = (this.video_error_times || 0) + 1;
-        console.warn('视频播放失败 error_times: ' + this.video_error_times + ', 尝试切换备用链接');
+        this.video_info.video_error_times = (this.video_info.video_error_times || 0) + 1;
+        console.warn('视频播放失败 error_times: ' + this.video_info.video_error_times + ', 尝试切换备用链接');
         this.video_url = chooseQuality(this.video_info)[0];
       })
 
@@ -1395,8 +1392,6 @@
      * @param {Object} video 
      */
     setVideo(video) {
-      this.audio_error_times = 0;
-      this.video_error_times = 0;
       this.audioElement.canplay = 0;
       this.videoElement.canplay = 0;
 
