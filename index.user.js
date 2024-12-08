@@ -208,6 +208,7 @@
       flex: 0;
       font-size: 12px;
       font-weight: 400;
+      width: fit-content;
       height: 32px;
       line-height: 32px;
       margin-top: 5px;
@@ -1522,7 +1523,7 @@
     return !desc_v2 ? [] : desc_v2.map((i) => {
       switch (i.type) {
         case 2:
-          return tag('a', { attrs: { target: '_blank', href: '//space.bilibili.com/' + i.biz_id }, innerHTML: i.raw_text })
+          return tag('a', { attrs: { target: '_blank', href: '//space.bilibili.com/' + i.biz_id }, innerHTML: '@' + i.raw_text })
         case 1:
         default:
           const text = i.raw_text.replaceAll(/BV[0-9a-zA-Z]{10,10}/g, (t) => `<a target="_blank" href="//www.bilibili.com/video/${t}">${t}</a>`);
