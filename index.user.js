@@ -974,23 +974,79 @@
     return [v, a];
   }
 
+  /**
+   * @typedef  {Object} Desc
+   * @property {Number} type      1 为普通文本 2 为 @ 用户
+   * @property {String} raw_text  文本
+   * @property {Number} biz_id    type=2 时 @ 的用户id
+   * 
+   * @typedef  {Object} VideoInfo 视频信息
+   * @property {String}       aid          视频id
+   * @property {String}       bvid         BV id
+   * @property {Number}       cid          分P id
+   * @property {String}       title        视频标题
+   * @property {String}       pic          视频封面url
+   * @property {Number}       pubdate      视频发布时间戳
+   * @property {Array<Desc>}  desc_v2      视频简介
+   * @property {Object}       owner        视频作者信息
+   * @property {Number}       owner.mid    用户id
+   * @property {String}       owner.name        昵称
+   * @property {String}       owner.face        头像url
+   * @property {Object}       pages              分P信息
+   * @property {Object}       stat               视频统计信息
+   * @property {Number}       stat.view          浏览量
+   * @property {Number}       stat.like          点赞数
+   * @property {Number}       stat.coin          投币数
+   * @property {Number}       stat.favorite      收藏数
+   * @property {Number}       stat.share         分享数
+   * @property {Number}       stat.danmaku       弹幕数
+   * @property {Number}       stat.reply         评论数
+   * @property {Number}       stat.dislike       不喜欢数
+   * @property {Object}       dimension          视频宽高
+   * @property {Number}       dimension.width    视频宽度
+   * @property {Number}       dimension.height   视频高度
+   * @property {Number}       duration           视频时长 (s)
+   * @property {Number}       timelength         视频时长 (ms)
+   * @property {Object}       relation           是否点赞投币信息
+   * @property {Bool}         relation.like         是否点赞
+   * @property {Number}       relation.coin         投币数量
+   * @property {Bool}         relation.favorite     是否点赞
+   * @property {Bool}         relation.dislike      是否不喜欢
+   * @property {Bool}         relation.attention    
+   * @property {Object}       subtitle           视频字幕信息
+   * @property {Object}       dash               视频播放信息
+   * @property {Number}       dash.duration      视频时长
+   * @property {Object}       dash.video         视频信息
+   * @property {Object}       dash.video         音频信息
+   * @property {Object}       dash.support_formats 支持格式
+   * @property {Number}       last_play_time     上次播放时长
+   * 
+   * b站视频信息
+   * @param {String} aid 
+   * @param {String} [cid]
+   * @return {Promise<VideoInfo>} 视频信息
+   */
   async function getInfo(aid, cid) {
-    const params = wbi({
-      aid: aid,
-    })
-    const r = await fetch('https://api.bilibili.com/x/web-interface/wbi/view?' + (new URLSearchParams(params)).toString(), {
+    aid = aid + '';
+    const params = {};
+    if (!aid.startsWith('BV')) {
+      params['aid'] = aid;
+    } else {
+      params['bvid'] = aid;
+    }
+    const r = await fetch('https://api.bilibili.com/x/web-interface/wbi/view?' + (new URLSearchParams(wbi(params))).toString(), {
       credentials: 'include',
     });
     const res = await r.json();
     const result = res.data;
     cid = cid || result.cid;
     if (!result) return;
-    result.relation = await getRelation(aid);
+    result.relation = await getRelation(result.aid);
     const playinfo = await getPlayUrl(result.bvid, cid);
     result.dash = playinfo.dash;
     result.timelength = playinfo.timelength;
     result.support_formats = playinfo.support_formats;
-    const res1 = await getPlayerInfo(aid, cid);
+    const res1 = await getPlayerInfo(result.aid, cid);
     if (res1) result.last_play_time = res1.last_play_time;
     const urls = chooseQuality(result);
     result.video_url = urls[0];
@@ -1051,6 +1107,14 @@
     // 当前播放速率
     currentRate = 1;
 
+    /**
+     * 视频播放器
+     * @param {HTMLElement} playerElement 
+     * @param {HTMLElement} videoElement 
+     * @param {HTMLElement} audioElement 
+     * @constructor
+     * @author HBcao233
+     */
     constructor(playerElement, videoElement, audioElement) {
       // Singleton
       if (Player.instance) {
@@ -1601,7 +1665,7 @@
 
   /**
    * 视频简介实体化
-   * @param {Object} desc_v2 
+   * @param {Array<Desc>} desc_v2 
    * @returns {Array<HTMLElement>}
    */
   function parseDesc(desc_v2) {
@@ -1611,7 +1675,12 @@
           return tag('a', { attrs: { target: '_blank', href: '//space.bilibili.com/' + i.biz_id }, innerHTML: '@' + i.raw_text })
         case 1:
         default:
-          const text = i.raw_text.replaceAll(/BV[0-9a-zA-Z]{10,10}/g, (t) => `<a target="_blank" href="//www.bilibili.com/video/${t}">${t}</a>`);
+          const text = i.raw_text
+            .replaceAll(/(https?:\/\/[0-9a-z\.]*(?:\/(?:(?! |\n)[\x00-\xff])*)?)|(BV[0-9a-zA-Z]{10,10})/g, (g0, g1, g2) => {
+              if (g1) return `<a target="_blank" href="${g1}">${g1}</a>`;
+              if (g2) return `<a target="_blank" href="//www.bilibili.com/video/${g2}">${g2}</a>`;
+              return g0;
+            });
           return tag('span', { innerHTML: text })
       }
     });
@@ -1623,7 +1692,6 @@
    */
   async function init(video) {
     inited = true;
-    // await getPlayerInfo();
 
     // UP 信息
     container.appendChild(tag('div', {
@@ -2162,7 +2230,7 @@
               t.querySelector('.text').innerText = '点击复制视频链接';
             })
             t.addEventListener('mouseleave', async () => {
-              t.querySelector('.text').innerText = (await getCurrentVideo()).stat.share + '';
+              t.querySelector('.text').innerText = player.video_info.stat.share + '';
             })
           }),
         ]
@@ -2182,7 +2250,7 @@
 
   /**
    * 获取当前 currentIndex 视频信息
-   * @returns {Object} 
+   * @returns {Promise<Object>} 
    */
   async function getCurrentVideo() {
     const v = videos[currentIndex];
@@ -2265,7 +2333,7 @@
       if (player) player.pause();
       if (document.querySelector('.bpx-player-loading-panel')) document.querySelector('.bpx-player-loading-panel').classList.add('bpx-state-loading');
       // 保存当前视频播放时长
-      if (videos[currentIndex]) (await getCurrentVideo()).currentTime = player.currentTime;
+      if (videos[currentIndex]) player.video_info.currentTime = player.currentTime;
 
       currentIndex = currentIndex + 1;
       const last_showlist = JSON.parse((window.localStorage.getItem('last_showlist') || '[]'));
@@ -2329,10 +2397,10 @@
    */
   async function shareClick() {
     shareVideo(videos[currentIndex].id).then();
-    await navigator.clipboard.writeText('https://www.bilibili.com/video/' + (await getCurrentVideo()).bvid);
+    await navigator.clipboard.writeText('https://www.bilibili.com/video/' + player.video_info.bvid);
     const i = document.querySelector('.video-toolbar .share.item .text');
     i.innerText = '复制成功'
-    setTimeout(async () => i.innerText = (await getCurrentVideo()).stat.share + '', 1000);
+    setTimeout(async () => i.innerText = player.video_info.stat.share + '', 1000);
   }
 
   /**
@@ -2371,8 +2439,8 @@
   window.addEventListener('load', () => {
     container = document.querySelector('.error-container');
     if (!container) return;
-    document.querySelector("iframe").remove();
-    document.querySelectorAll("script").forEach((i) => i.remove());
+    document.querySelector("iframe") && document.querySelector("iframe").remove();
+    document.querySelectorAll("script") && document.querySelectorAll("script").forEach((i) => i.remove());
     if (isMobile()) {
       document.querySelector("html").style.height = `${window.screen.height}px`;
       document.querySelector("html").style.overflow = 'hidden';
