@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 404 刷视频
 // @namespace    http://tampermonkey.net/
-// @version      2024.12.08.1
+// @version      2024.12.09.0
 // @description  在 Bilibili 404页面刷视频
 // @author       HBcao233
 // @match        http*://*.bilibili.com/*
@@ -54,6 +54,14 @@
       93.333333% { clip-path: polygon(0 0, 50% 0, 50% 50%, 100% 0, 100% 100%, 0 100%) }
       93.333334% { clip-path: polygon(0 0, 50% 0, 50% 50%, 100% 0, 100% 0, 100% 100%, 0 100%) }
       100%       { clip-path: polygon(0 0, 50% 0, 50% 50%, 50% 0, 100% 0, 100% 100%, 0 100%) }
+    }
+    @media screen and (max-width: 500px) {
+      .h5-container, #biliMainHeader {
+        display: none;
+      }
+      .error-container {
+        display: block;
+      }
     }
 
     img[src=""], img:not([src]) {
@@ -134,7 +142,7 @@
       margin-right: 4px;
     }
 
-    #playerWrap {
+    .player-wrap {
       margin-top: 10px;
       display: flex;
     }
@@ -326,9 +334,12 @@
       opacity: 0;
       transition: opacity .2s ease-in;
     }
-    #bilibili-player.hover .bpx-player-control, #bilibili-player:has(.control-btn:hover) .bpx-player-control, #bilibili-player:has(.bpx-player-progress:hover) .bpx-player-control {
+    #bilibili-player.hover .bpx-player-control,
+    #bilibili-player:has(.control-btn:hover) .bpx-player-control, 
+    #bilibili-player:has(.bpx-player-progress:hover) .bpx-player-control {
       opacity: 1;
     }
+
     .bpx-player-control-mask {
       background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAADGCAYAAAAT+OqFAAAAdklEQVQoz42QQQ7AIAgEF/T/D+kbq/RWAlnQyyazA4aoAB4FsBSA/bFjuF1EOL7VbrIrBuusmrt4ZZORfb6ehbWdnRHEIiITaEUKa5EJqUakRSaEYBJSCY2dEstQY7AuxahwXFrvZmWl2rh4JZ07z9dLtesfNj5q0FU3A5ObbwAAAABJRU5ErkJggg==) repeat-x bottom;
       bottom: 0;
@@ -663,13 +674,13 @@
       display: block;
     }
 
-    #playerWrap .video-controls {
+    .player-wrap .video-controls {
       display: flex;
       flex-direction: column;
       justify-content: center;
       margin-left: 5px;
     }
-    #playerWrap .video-controls > .item {
+    .player-wrap .video-controls > .item {
       transform: rotate(90deg);
       border-radius: 5px;
       background: var(--text2, #61666D);
@@ -682,7 +693,7 @@
       color: white;
       margin-bottom: 5px;
     }
-    #playerWrap .video-controls > .item:hover {
+    .player-wrap .video-controls > .item:hover {
       background: var(--brand_blue, #00AEEC);
     }
 
@@ -769,6 +780,24 @@
     .video-desc-container .basic-desc-info a {
       color: var(--brand_blue, #00aeec);
     }
+
+    @media screen and (max-width: 500px) {
+      .video-info-container, .up-info-container, #arc_toolbar_report, .video-desc-container {
+        display: none;
+      }
+      .player-wrap {
+        position: absolute;
+        top: 0;
+        left: 0;
+        margin-top: 0;
+      }
+      .video-controls {
+        position: fixed;
+        top: 50%;
+        right: 5px;
+        z-index: 100;
+      }
+    }
 `
   String.prototype.rsplit = function (sep, maxsplit) {
     let split = this.split(sep);
@@ -803,6 +832,9 @@
   function getCookie(name) {
     var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
     if (match) return match[2];
+  }
+  function isMobile() {
+    return window.screen.width < 500;
   }
 
   async function getMixinKey() {
@@ -914,13 +946,30 @@
     });
 
     const v_info = sorted_video[0];
-    const a_info = video.dash.audio && video.dash.audio[0];
+    const audios = video.dash.audio;
     let v = v_info.baseUrl;
     let a = null;
-    if (ve) v = sorted_video[0].backupUrl[ve - 1];
-    if (a_info) {
-      a = a_info.baseUrl
-      if (ae) a = a_info.backupUrl[ae - 1];
+    if (ve) {
+      if (ve <= sorted_video[0].backupUrl.length) {
+        v = sorted_video[0].backupUrl[ve - 1];
+      } else if (ve == sorted_video[0].backupUrl.length + 1) {
+        v = sorted_video[1].baseUrl;
+      } else {
+        v = sorted_video[1].backupUrl[ve - sorted_video[0].backupUrl.length - 2];
+      }
+    }
+
+    if (audios) {
+      a = audios[0].baseUrl
+      if (ae) {
+        if (ae <= audios[0].backupUrl.length) {
+          a = audios[0].backupUrl[ae - 1];
+        } else if (ae == audios[0].backupUrl.length + 1) {
+          a = audios[1].baseUrl;
+        } else {
+          a = audios[1].backupUrl[ae - audios[0].backupUrl.length - 2];
+        }
+      }
     }
     return [v, a];
   }
@@ -968,6 +1017,22 @@
     return await _likeVideo(aid, 2);
   }
 
+  async function shareVideo(aid) {
+    const params = {
+      aid: aid,
+      csrf: getCookie('bili_jct'),
+      eab_x: 2,
+      ramval: 0,
+      source: 'web_normal',
+      ga: 1
+    }
+    const r = await fetch('https://api.bilibili.com/x/web-interface/share/add?' + (new URLSearchParams(params)).toString(), {
+      method: 'POST',
+      credentials: 'include',
+    });
+    return await r.json();
+  }
+
   class Player {
     static instance
     #video_url = '';
@@ -985,6 +1050,7 @@
     leave_timer = null;
     // 当前播放速率
     currentRate = 1;
+
     constructor(playerElement, videoElement, audioElement) {
       // Singleton
       if (Player.instance) {
@@ -995,6 +1061,12 @@
       this.playerElement = playerElement;
       this.videoElement = videoElement;
       this.audioElement = audioElement;
+      if (isMobile()) {
+        this.playerElement.style.width = window.innerWidth;
+        this.playerElement.style.height = window.innerHeight;
+        this.videoElement.style.width = window.innerWidth;
+        this.videoElement.style.height = window.innerHeight;
+      }
       this.progressElement = this.playerElement.querySelector('.bpx-player-progress');
       this.canvas = tag('canvas');
       this.videoElementPreview = tag('video', {
@@ -1025,10 +1097,16 @@
     playerLeave() {
       this.playerElement.style.cursor = 'none';
       this.playerElement.classList.remove('hover');
+      if (isMobile()) {
+        this.playerElement.querySelector('.bpx-player-control').style.opacity = 0;
+      }
     }
     playerEnter() {
       this.playerElement.style.cursor = 'pointer';
       this.playerElement.classList.add('hover');
+      if (isMobile()) {
+        this.playerElement.querySelector('.bpx-player-control').style.opacity = 1;
+      }
       clearTimeout(this.leave_timer);
       this.leave_timer = setTimeout(() => this.playerLeave(), 3000);
     }
@@ -1073,6 +1151,11 @@
       this.playerElement.addEventListener('mouseenter', () => this.playerEnter());
       this.playerElement.addEventListener('mousemove', () => this.playerEnter());
       this.playerElement.addEventListener('mouseleave', () => this.playerLeave());
+      if (isMobile()) {
+        this.playerElement.addEventListener('touchstart', () => this.playerEnter());
+        this.playerElement.addEventListener('touchmove', () => this.playerEnter());
+        this.playerElement.addEventListener('touchend', () => this.playerLeave());
+      }
       /**
        * 监听进入/退出全屏
        */
@@ -1168,10 +1251,10 @@
         if (this.progress_is_mousedown) return;
         this.progress_render();
       });
-      this.audioElement.addEventListener('error', () => {
+      this.audioElement.addEventListener('error', (e) => {
         if (!this.has_audio) return;
         this.video_info.audio_error_times = (this.video_info.audio_error_times || 0) + 1;
-        console.warn('音频播放失败 error_times: ' + this.video_info.audio_error_times + ', 尝试切换备用链接');
+        console.warn('音频播放失败 error_times: ', this.video_info.audio_error_times, ', 尝试切换备用链接');
         this.audio_url = chooseQuality(this.video_info)[1];
       });
 
@@ -1204,10 +1287,12 @@
         if (this.progress_is_mousedown) return;
         this.progress_render();
       });
-      this.videoElement.addEventListener('error', async () => {
+      this.videoElement.addEventListener('error', (e) => {
         this.video_info.video_error_times = (this.video_info.video_error_times || 0) + 1;
-        console.warn('视频播放失败 error_times: ' + this.video_info.video_error_times + ', 尝试切换备用链接');
-        this.video_url = chooseQuality(this.video_info)[0];
+        const t = chooseQuality(this.video_info)[0];
+        if (!t) return;
+        console.warn('视频播放失败 error_times: ', this.video_info.video_error_times, ', 尝试切换备用链接');
+        this.video_url = t;
       })
 
       this.videoElement.addEventListener('waiting', async () => {
@@ -1272,7 +1357,7 @@
         if (this.progress_is_mousedown || e.target.closest('.bpx-player-progress')) {
           progress_func(e);
         }
-      })
+      });
       this.progressElement.addEventListener('mouseleave', (e) => {
         if (!this.progress_is_mousedown) this.progressElement.classList.remove('active');
         progress_func(e);
@@ -2243,6 +2328,7 @@
    * 转发按钮
    */
   async function shareClick() {
+    shareVideo(videos[currentIndex].id).then();
     await navigator.clipboard.writeText('https://www.bilibili.com/video/' + (await getCurrentVideo()).bvid);
     const i = document.querySelector('.video-toolbar .share.item .text');
     i.innerText = '复制成功'
@@ -2285,11 +2371,19 @@
   window.addEventListener('load', () => {
     container = document.querySelector('.error-container');
     if (!container) return;
+    document.querySelector("iframe").remove();
+    document.querySelectorAll("script").forEach((i) => i.remove());
+    if (isMobile()) {
+      document.querySelector("html").style.height = `${window.screen.height}px`;
+      document.querySelector("html").style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+    }
+    document.querySelector('meta[name="viewport"]').content = 'width=device-width, height=device-height, user-scalable=yes, initial-scale=1.0';
     container.innerHTML = '';
     document.title = '404 刷视频'
     container.style.cssText = 'margin-top: 0; margin-bottom: 0; padding: 10px 40px; width: 740px'
     let style = document.createElement('style');
-    style.innerHTML = styles
+    style.innerHTML = styles;
     document.body.after(style);
     nextVideo().then();
   })
