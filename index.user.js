@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 404 刷视频
 // @namespace    http://tampermonkey.net/
-// @version      2024.12.24.0
+// @version      2025.01.01.0
 // @description  在 Bilibili 404页面刷视频
 // @author       HBcao233
 // @match        http*://*.bilibili.com/*
@@ -1115,10 +1115,37 @@
     return await r.json();
   }
 
+  /**
+   * 记录播放历史
+   * @param {Number} aid 
+   * @param {Number} cid 
+   * @param {Number} progress 
+   * @returns 
+   */
+  async function record_history(aid, cid, progress) {
+    progress = parseInt(progress)
+    const r = await fetch('https://api.bilibili.com/x/v2/history/report', {
+      method: 'POST',
+      credentials: 'include',
+      body: new URLSearchParams({
+        aid: aid,
+        cid: cid,
+        csrf: getCookie('bili_jct'),
+        progress: progress,
+        platform: 'pc',
+      }),
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+      }
+    });
+    return await r.json();
+  }
+
   class Player {
     static instance
     #video_url = '';
     #audio_url = '';
+    #lastPauseTimer = null;
 
     // 进度条被按下
     progress_is_mousedown = false;
@@ -1218,6 +1245,11 @@
       this.progressElement.querySelector('.current').style.transform = 'scaleX(' + current + ')';
       this.progressElement.querySelector('.thumb').style.transform = 'translateX(' + current * total_px + 'px)';
       this.playerElement.querySelector('.control-btn.time .current').innerHTML = formatTime(this.currentTime);
+
+      if (Math.abs(this.currentTime - (this.video_info.lastRecordTime || 0)) > 15) {
+        this.video_info.lastRecordTime = this.currentTime;
+        record_history(this.video_info.aid, this.video_info.cid, this.currentTime);
+      }
     }
 
     /**
@@ -1568,10 +1600,12 @@
      * @param {Object} video 
      */
     setVideo(video) {
+
       this.audioElement.canplay = 0;
       this.videoElement.canplay = 0;
 
       this.video_info = video;
+      this.video_info.lastRecordTime = 0;
       const urls = chooseQuality(video);
       this.video_url = urls[0];
       this.audio_url = urls[1];
@@ -1595,6 +1629,7 @@
       if (this.has_audio) this.audioElement.play();
       this.videoElement.play();
       this.playerElement.classList.remove('bpx-state-paused');
+      clearTimeout(this.#lastPauseTimer);
     }
 
     /**
@@ -1604,6 +1639,13 @@
       if (this.has_audio) this.audioElement.pause();
       this.videoElement.pause();
       this.playerElement.classList.add('bpx-state-paused');
+
+      if (Math.abs(this.currentTime - (this.video_info.lastRecordTime || 0)) > 5) {
+        this.#lastPauseTimer = setTimeout(() => {
+          this.video_info.lastRecordTime = this.currentTime;
+          record_history(this.video_info.aid, this.video_info.cid, this.currentTime);
+        }, 5000);
+      }
     }
 
     /**
@@ -2275,7 +2317,7 @@
                 if (res.code == 0) t.querySelector('.text').innerText = parseInt(player.video_info.stat.share) + 1;
                 t.querySelector('.copy-tip').innerText = '复制成功';
                 setTimeout(async () => t.querySelector('.copy-tip').innerText = '点击复制视频链接', 3000);
-            })
+              })
             });
           }),
         ]
@@ -2378,7 +2420,14 @@
       if (player) player.pause();
       if (document.querySelector('.bpx-player-loading-panel')) document.querySelector('.bpx-player-loading-panel').classList.add('bpx-state-loading');
       // 保存当前视频播放时长
-      if (videos[currentIndex]) player.video_info.currentTime = player.currentTime;
+      if (videos[currentIndex]) {
+        player.video_info.currentTime = player.currentTime;
+
+        if (Math.abs(player.currentTime - (player.video_info.lastRecordTime || 0)) > 15) {
+          player.video_info.lastRecordTime = player.currentTime;
+          record_history(player.video_info.aid, player.video_info.cid, player.currentTime);
+        }
+      }
 
       currentIndex = currentIndex + 1;
       const last_showlist = JSON.parse((window.localStorage.getItem('last_showlist') || '[]'));
@@ -2393,7 +2442,8 @@
       }
       addto_showlist(videos[currentIndex])
       window.localStorage.setItem('last_showlist', JSON.stringify(last_showlist));
-      await updateVideo()
+      await updateVideo();
+      record_history(player.video_info.aid, player.video_info.cid, 0);
       return;
     }
     showToast('已经到顶啦 >ʍ<');
