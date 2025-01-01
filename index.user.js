@@ -2423,7 +2423,7 @@
       if (videos[currentIndex]) {
         player.video_info.currentTime = player.currentTime;
 
-        if (Math.abs(player.currentTime - (player.video_info.lastRecordTime || 0)) > 15) {
+        if (Math.abs(player.currentTime - (player.video_info.lastRecordTime || 0)) > 3) {
           player.video_info.lastRecordTime = player.currentTime;
           record_history(player.video_info.aid, player.video_info.cid, player.currentTime);
         }
