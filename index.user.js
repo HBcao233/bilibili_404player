@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 404 刷视频
 // @namespace    http://tampermonkey.net/
-// @version      2024.12.09.0
+// @version      2024.12.24.0
 // @description  在 Bilibili 404页面刷视频
 // @author       HBcao233
 // @match        http*://*.bilibili.com/*
@@ -692,6 +692,7 @@
       justify-content: center;
       color: white;
       margin-bottom: 5px;
+      user-select: none !important;
     }
     .player-wrap .video-controls > .item:hover {
       background: var(--brand_blue, #00AEEC);
@@ -743,6 +744,7 @@
       padding-bottom: 12px;
     }
     #arc_toolbar_report .video-toolbar > .item {
+      position: relative;
       margin-right: 8px;
       display: flex;
       align-items: center;
@@ -754,7 +756,8 @@
       color: var(--text2, #61666D);
       cursor: pointer;
     }
-    #arc_toolbar_report .video-toolbar > .item.on, #arc_toolbar_report .video-toolbar > .item:hover {
+    #arc_toolbar_report .video-toolbar > .item.on, 
+    #arc_toolbar_report .video-toolbar > .item:hover {
       color: var(--brand_blue, #00AEEC);
     }
     #arc_toolbar_report .video-toolbar > .item > .icon {
@@ -762,6 +765,29 @@
       width: 28px;
       height: 28px;
       margin-right: 8px;
+    }
+    #arc_toolbar_report .video-toolbar > .item.share > .text {
+      opacity: 1;
+      transform: translateY(0px);
+      transition: all .3s;
+      color: var(--text2, #61666D);
+    }
+    #arc_toolbar_report .video-toolbar > .item.share > .copy-tip {
+      position: absolute;
+      left: 36px;
+      opacity: 0;
+      transform: translateY(15px);
+      transition: transform .3s, opacity .3s;
+      color: var(--brand_blue, #00AEEC);
+    }
+    #arc_toolbar_report .video-toolbar > .item.share:hover > .text {
+      opacity: 0;
+      transform: translateY(-15px);
+      color: var(--brand_blue, #00AEEC);
+    }
+    #arc_toolbar_report .video-toolbar > .item.share:hover > .copy-tip {
+      opacity: 1;
+      transform: translateY(0px);
     }
 
     .video-desc-container {
@@ -2200,7 +2226,25 @@
               tag('svg', { class: 'icon', attrs: { viewBox: "0 0 36 36" }, innerHTML: '<path fill-rule="evenodd" clip-rule="evenodd" d="M9.77234 30.8573V11.7471H7.54573C5.50932 11.7471 3.85742 13.3931 3.85742 15.425V27.1794C3.85742 29.2112 5.50932 30.8573 7.54573 30.8573H9.77234ZM11.9902 30.8573V11.7054C14.9897 10.627 16.6942 7.8853 17.1055 3.33591C17.2666 1.55463 18.9633 0.814421 20.5803 1.59505C22.1847 2.36964 23.243 4.32583 23.243 6.93947C23.243 8.50265 23.0478 10.1054 22.6582 11.7471H29.7324C31.7739 11.7471 33.4289 13.402 33.4289 15.4435C33.4289 15.7416 33.3928 16.0386 33.3215 16.328L30.9883 25.7957C30.2558 28.7683 27.5894 30.8573 24.528 30.8573H11.9911H11.9902Z" fill="currentColor"></path>' }),
               tag('span', { class: 'text', children: video.stat.like + '' }),
             ]
-          }, (t) => t.addEventListener('click', likeClick)),
+          }, (t) => t.addEventListener('click', async () => {
+            let text;
+            if (!t.classList.contains('on')) {
+              const res = await likeVideo(videos[currentIndex].id);
+              if (res.code == 0) {
+                t.classList.add('on')
+                text = '点赞成功'
+                t.querySelector('.text').innerText = player.video_info.stat.like + 1;
+              } else {
+                text = '点赞失败, 未登录'
+              }
+            } else {
+              t.classList.remove('on')
+              await unlikeVideo(videos[currentIndex].id)
+              text = '取消点赞'
+              t.querySelector('.text').innerText = player.video_info.stat.like;
+            }
+            showToast(text);
+          })),
           tag('div', {
             class: 'coin item' + (video.relation.coin ? ' on' : ''),
             attrs: { title: '投币' },
@@ -2223,15 +2267,16 @@
             children: [
               tag('svg', { class: 'icon', attrs: { viewBox: "0 0 28 28" }, innerHTML: '<path d="M12.6058 10.3326V5.44359C12.6058 4.64632 13.2718 4 14.0934 4C14.4423 4 14.78 4.11895 15.0476 4.33606L25.3847 12.7221C26.112 13.3121 26.2087 14.3626 25.6007 15.0684C25.5352 15.1443 25.463 15.2144 25.3847 15.2779L15.0476 23.6639C14.4173 24.1753 13.4791 24.094 12.9521 23.4823C12.7283 23.2226 12.6058 22.8949 12.6058 22.5564V18.053C7.59502 18.053 5.37116 19.9116 2.57197 23.5251C2.47607 23.6489 2.00031 23.7769 2.00031 23.2122C2.00031 16.2165 3.90102 10.3326 12.6058 10.3326Z" fill="currentColor"></path>' }),
               tag('span', { class: 'text', children: video.stat.share + '' }),
+              tag('span', { class: 'copy-tip', children: '点击复制视频链接' }),
             ]
           }, (t) => {
-            t.addEventListener('click', shareClick);
-            t.addEventListener('mouseenter', () => {
-              t.querySelector('.text').innerText = '点击复制视频链接';
+            t.addEventListener('click', () => {
+              shareClick().then((res) => {
+                if (res.code == 0) t.querySelector('.text').innerText = parseInt(player.video_info.stat.share) + 1;
+                t.querySelector('.copy-tip').innerText = '复制成功';
+                setTimeout(async () => t.querySelector('.copy-tip').innerText = '点击复制视频链接', 3000);
             })
-            t.addEventListener('mouseleave', async () => {
-              t.querySelector('.text').innerText = player.video_info.stat.share + '';
-            })
+            });
           }),
         ]
       })
@@ -2396,11 +2441,9 @@
    * 转发按钮
    */
   async function shareClick() {
-    shareVideo(videos[currentIndex].id).then();
+    let res = await shareVideo(videos[currentIndex].id);
     await navigator.clipboard.writeText('https://www.bilibili.com/video/' + player.video_info.bvid);
-    const i = document.querySelector('.video-toolbar .share.item .text');
-    i.innerText = '复制成功'
-    setTimeout(async () => i.innerText = player.video_info.stat.share + '', 1000);
+    return res;
   }
 
   /**
