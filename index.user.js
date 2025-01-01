@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 404 刷视频
 // @namespace    http://tampermonkey.net/
-// @version      2025.01.01.0
+// @version      2025.01.01.1
 // @description  在 Bilibili 404页面刷视频
 // @author       HBcao233
 // @match        http*://*.bilibili.com/*
@@ -824,6 +824,81 @@
         z-index: 100;
       }
     }
+
+    @keyframes roll {
+      0% { transform: translateX(0) translateZ(0); }
+      100% { transform: translateX(var(--translateX)) translateZ(0); }
+    }
+    @keyframes disappear {
+      0% { opacity: 1; }
+      99% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    .bpx-player-row-dm-wrap {
+      cursor: pointer;
+      height: 100%;
+      left: 0;
+      -webkit-mask-position: center;
+      mask-position: center;
+      overflow: hidden;
+      pointer-events: none;
+      position: absolute;
+      top: 0;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      width: 100%;
+      z-index: 2;
+      -webkit-box-pack: center;
+      -ms-flex-pack: center;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      justify-content: center;
+      z-index: 11;
+    }
+    
+    .bili-danmaku-x-dm {
+      user-select: none;
+      white-space: pre;
+      position: absolute;
+      line-height: 1.125;
+      perspective: 500px;
+      transform: translate(-50%, var(--translateY, 0));
+      font-family: SimHei, 'Microsoft JhengHei', Arial, Helvetica, sans-serif;
+      font-weight: bold;
+      font-size: var(--fontSize, 25px);
+      left: var(--offset, -10px);
+      color: var(--color, #ffffff);
+      text-shadow: 1px 0 1px #000000,0 1px 1px #000000,0 -1px 1px #000000,-1px 0 1px #000000;
+      transform: translateZ(0);
+      top: var(--top, 0);
+      z-index: var(--zIndex, 200);
+      will-change: transform, opacity, top, left;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-align: center;
+      -ms-flex-align: center;
+      align-items: center;
+    }
+    .bili-danmaku-x-dm.bili-danmaku-x-center  {
+      top: 0;
+      left: 50%;
+      transform: translate(-50%, var(--translateY, 0));
+      animation: disappear linear var(--duration, 8.5s) forwards;
+    }
+    .bili-danmaku-x-dm.bili-danmaku-x-roll {
+      left: 100%;
+      animation: roll linear var(--duration, 8.5s) forwards;
+    }
+    .bpx-state-paused .bili-danmaku-x-dm {
+      animation-play-state: paused !important;
+    }
 `
   String.prototype.rsplit = function (sep, maxsplit) {
     let split = this.split(sep);
@@ -1141,6 +1216,34 @@
     return await r.json();
   }
 
+  function get_danmaku(aid, cid, time) {
+    return new Promise((resolve, reject) => {
+      const segment_index = Math.floor(time / 360) + 1;
+      const params = {
+        type: 1,
+        pid: aid,
+        oid: cid,
+        segment_index: segment_index,
+        pull_mode: 1,
+        ps: 0,
+        pe: 120000,
+        web_location: 1315873,
+      }
+      fetch('https://api.bilibili.com/x/v2/dm/web/seg.so?' + (new URLSearchParams(params)).toString(), {
+        credentials: 'include',
+      }).then((r) => {
+        if (r.status != 200) {
+          resolve(r);
+        }
+        return r.arrayBuffer()
+      }).then((res) => {
+        resolve(decodeDmSegMobileReply(new Uint8Array(res)))
+      }).catch((err) => {
+        reject(err);
+      });
+    })
+  }
+
   class Player {
     static instance
     #video_url = '';
@@ -1250,7 +1353,104 @@
         this.video_info.lastRecordTime = this.currentTime;
         record_history(this.video_info.aid, this.video_info.cid, this.currentTime);
       }
+
+      if (!this.video_info.danmakus) this.video_info.danmakus = [];
+      if (Math.abs(this.currentTime - (this.video_info.lastDanmakuTime || -350)) >= 350) {
+        this.video_info.lastDanmakuTime = this.currentTime;
+        get_danmaku(this.video_info.aid, this.video_info.cid, this.currentTime + 10).then((r) => {
+          if (!r.elems || r.elems.length == 0) return;
+          const elems = r.elems.sort((a, b) => a.progress - b.progress);
+          console.log('new danmakus', elems)
+          for (const e of elems) {
+            this.video_info.danmakus.push(e);
+          }
+        })
+      }
+
+      for (let i = (this.danmaku_offset || 0); i < this.video_info.danmakus.length; i++) {
+        if (!this.video_info.danmakus[i].progress) return;
+        if (this.currentTime * 1000 - this.video_info.danmakus[i].progress > 10) {
+          this.danmaku_offset = i + 1;
+          this.load_danmaku(this.video_info.danmakus[i]);
+        } else {
+          break;
+        }
+      }
     }
+
+    load_danmaku = (function () {
+      let rolls = [-1, -1, -1, -1, -1, -1, -1, -1];
+      let tops = [-1, -1, -1, -1, -1, -1, -1, -1];
+      return function (danmaku) {
+        if (
+          danmaku.mode < 4 &&
+          (rolls.reduce((num, value) => {
+            return value === -1 ? num + 1 : num;
+          }, 0) <= 0) ||
+          (tops.reduce((num, value) => {
+            return value === -1 ? num + 1 : num;
+          }, 0) <= 0)
+        ) {
+          setTimeout(() => this.load_danmaku(danmaku), 200);
+          return
+        }
+
+        console.log('load_danmaku', danmaku.mode, danmaku.content);
+        const r = danmaku.color >> 16 & 255;
+        const g = danmaku.color >> 8 & 255;
+        const b = danmaku.color & 255;
+        let t = tag('div', {
+          class: 'bili-danmaku-x-dm',
+          attrs: {
+            'data-id': danmaku.idStr,
+          },
+          innerText: danmaku.content,
+        });
+        t.style.setProperty('--color', `rgb(${r},${g},${b})`);
+        t.style.setProperty('--fontSize', danmaku.fontsize + 'px');
+        switch (danmaku.mode) {
+          case 9: // BAS 弹幕（仅限于特殊弹幕专包）
+          case 8: // 代码弹幕
+          case 7: // 高级弹幕
+          case 6: // 逆向弹幕
+            t = null;
+            break;
+          case 5: // 顶部弹幕
+            t.top_index = tops.indexOf(-1);
+            tops[t.top_index] = 0;
+
+            t.classList.add('bili-danmaku-x-center');
+            t.style.setProperty('--translateY', t.top_index * danmaku.fontsize + 'px');
+            break;
+          case 4: // 底部弹幕
+            t = null;
+            break;
+          default: // 普通弹幕
+            t.roll_index = rolls.indexOf(-1);
+            let rand;
+            while (rolls.indexOf((rand = Math.floor(Math.random() * 8) * danmaku.fontsize)) !== -1) { }
+            rolls[t.roll_index] = rand;
+
+            t.classList.add('bili-danmaku-x-roll');
+            t.style.setProperty('--top', rand + 'px');
+            t.style.setProperty('--translateX', '-979px');
+        }
+        if (t && !this.playerElement.querySelector(`.bili-danmaku-x-dm[data-id="${danmaku.idStr}"]`)) {
+          t.addEventListener('animationend', () => {
+            if (t.top_index >= 0) {
+              tops[t.top_index] = -1;
+            }
+            t.remove()
+          });
+          this.playerElement.querySelector('.bpx-player-row-dm-wrap').appendChild(t);
+          if (t.roll_index >= 0) {
+            setTimeout(() => {
+              rolls[t.roll_index] = -1;
+            }, 40 * t.clientWidth);
+          }
+        }
+      }
+    })();
 
     /**
      * 视频播放/暂停
@@ -1546,12 +1746,19 @@
       return this.videoElement.currentTime;
     }
     /**
-     * seeking
+     * 跳转播放 seeking
      * @param {Number} c
      */
     set currentTime(c) {
       if (this.has_audio) this.audioElement.currentTime = c;
       this.videoElement.currentTime = c;
+
+      for (let i = (this.danmaku_offset || 0); i < this.video_info.danmakus.length; i++) {
+        if (this.video_info.danmakus[i].progress > c * 1000) {
+          this.danmaku_offset = i - 1 > 0 ? i - 1 : 0;
+          break;
+        }
+      }
     }
 
     /**
@@ -1600,6 +1807,7 @@
      * @param {Object} video 
      */
     setVideo(video) {
+      this.danmaku_offset = 0;
 
       this.audioElement.canplay = 0;
       this.videoElement.canplay = 0;
@@ -1714,6 +1922,7 @@
       options.class.forEach(e => { if (e) newElement.classList.add(e) });
     }
     if (options.innerHTML) newElement.innerHTML = options.innerHTML;
+    if (options.innerText) newElement.innerText = options.innerText;
     if (options.children) {
       if (!Array.isArray(options.children)) options.children = [options.children];
       options.children.forEach(e => {
@@ -1861,6 +2070,9 @@
           class: 'bpx-player-video-area', children: [
             tag('div', {
               class: 'bpx-player-video-wrap', children: [videoElement, audioElement],
+            }),
+            tag('div', {
+              class: 'bpx-player-row-dm-wrap',
             }),
             tag('div', {
               class: 'bpx-player-top-wrap', children: [
@@ -2559,5 +2771,429 @@
     animationData: JSON.parse('{"v":"5.6.6","ip":0,"op":1,"fr":60,"w":18,"h":18,"layers":[{"ind":1890,"nm":"surface6457","ao":0,"ip":0,"op":60,"st":0,"ty":4,"ks":{"ty":"tr","o":{"k":100},"r":{"k":0},"p":{"k":[0,0]},"a":{"k":[0,0]},"s":{"k":[133.33,133.33]},"sk":{"k":0},"sa":{"k":0}},"shapes":[{"ty":"gr","hd":false,"nm":"surface6457","it":[{"ty":"gr","hd":false,"it":[{"ty":"sh","ks":{"k":{"i":[[0,0],[0,0],[0.37,0],[0,0.38],[0,0],[-0.37,0],[0,-0.38]],"o":[[0,0],[0,0.38],[-0.37,0],[0,0],[0,-0.38],[0.37,0],[0,0]],"v":[[9.29,6.28],[9.29,7.93],[8.61,8.6],[7.94,7.93],[7.94,6.28],[8.61,5.6],[9.29,6.28]],"c":true}}},{"ty":"fl","o":{"k":100},"c":{"k":[0.2,0.2,0.2,1]}},{"ty":"tr","o":{"k":100},"r":{"k":0},"p":{"k":[0,0]},"a":{"k":[0,0]},"s":{"k":[100,100]},"sk":{"k":0},"sa":{"k":0},"hd":false}]},{"ty":"gr","hd":false,"it":[{"ty":"sh","ks":{"k":{"i":[[0,0],[0,0],[0.36,0],[0,0.36],[0,0],[-0.36,0],[0,-0.36]],"o":[[0,0],[0,0.36],[-0.36,0],[0,0],[0,-0.36],[0.36,0],[0,0]],"v":[[5.44,6.26],[5.44,7.95],[4.78,8.6],[4.12,7.95],[4.12,6.26],[4.78,5.6],[5.44,6.26]],"c":true}}},{"ty":"fl","o":{"k":100},"c":{"k":[0.2,0.2,0.2,1]}},{"ty":"tr","o":{"k":100},"r":{"k":0},"p":{"k":[0,0]},"a":{"k":[0,0]},"s":{"k":[100,100]},"sk":{"k":0},"sa":{"k":0},"hd":false}]},{"ty":"gr","hd":false,"it":[{"ty":"sh","ks":{"k":{"i":[[0,0],[0,0],[1.38,0],[0,0],[0,1.38],[0,0],[-1.38,0],[0,0],[0,-1.38]],"o":[[0,0],[0,1.38],[0,0],[-1.38,0],[0,0],[0,-1.38],[0,0],[1.38,0],[0,0]],"v":[[7,-3],[7,3],[4.5,5.5],[-4.5,5.5],[-7,3],[-7,-3],[-4.5,-5.5],[4.5,-5.5],[7,-3]],"c":true}}},{"ty":"st","lc":1,"lj":1,"ml":4,"o":{"k":100},"w":{"k":1.5},"c":{"k":[0.2,0.2,0.2,1]},"hd":false},{"ty":"tr","o":{"k":100},"r":{"k":0},"p":{"k":[6.74,7.13]},"a":{"k":[0,0]},"s":{"k":[75,75]},"sk":{"k":0},"sa":{"k":0},"hd":false}]},{"ty":"gr","hd":false,"it":[{"ty":"sh","ks":{"k":{"i":[[0,0],[0,0],[1.03,0],[0,0],[0,1.04],[0,0],[-1.04,0],[0,0],[0,-1.04]],"o":[[0,0],[0,1.04],[0,0],[-1.04,0],[0,0],[0,-1.04],[0,0],[1.03,0],[0,0]],"v":[[11.99,4.88],[11.99,9.38],[10.11,11.25],[3.36,11.25],[1.49,9.38],[1.49,4.88],[3.36,3],[10.11,3],[11.99,4.88]],"c":true}}},{"ty":"fl","o":{"k":100},"c":{"k":[1,1,1,1]}},{"ty":"tr","o":{"k":100},"r":{"k":0},"p":{"k":[0,0]},"a":{"k":[0,0]},"s":{"k":[100,100]},"sk":{"k":0},"sa":{"k":0},"hd":false}]},{"ty":"gr","hd":false,"it":[{"ty":"sh","ks":{"k":{"i":[[0,0],[0,0],[0.33,0.27],[-0.23,0.27],[0,0],[-0.33,-0.27],[0.24,-0.27]],"o":[[0,0],[-0.24,0.27],[-0.33,-0.27],[0,0],[0.23,-0.27],[0.33,0.27],[0,0]],"v":[[10.5,1.42],[9.07,3.04],[8.04,3.04],[7.87,2.07],[9.3,0.45],[10.33,0.45],[10.5,1.42]],"c":true}}},{"ty":"fl","o":{"k":100},"c":{"k":[0.2,0.2,0.2,1]}},{"ty":"tr","o":{"k":100},"r":{"k":0},"p":{"k":[0,0]},"a":{"k":[0,0]},"s":{"k":[100,100]},"sk":{"k":0},"sa":{"k":0},"hd":false}]},{"ty":"gr","hd":false,"it":[{"ty":"sh","ks":{"k":{"i":[[0,0],[0,0],[0.28,-0.25],[0.24,0.26],[0,0],[-0.28,0.26],[-0.25,-0.26]],"o":[[0,0],[0.24,0.26],[-0.28,0.26],[0,0],[-0.25,-0.26],[0.28,-0.25],[0,0]],"v":[[4.1,0.52],[5.57,2.08],[5.5,3.01],[4.55,3.01],[3.08,1.45],[3.15,0.51],[4.1,0.52]],"c":true}}},{"ty":"fl","o":{"k":100},"c":{"k":[0.2,0.2,0.2,1]}},{"ty":"tr","o":{"k":100},"r":{"k":0},"p":{"k":[0,0]},"a":{"k":[0,0]},"s":{"k":[100,100]},"sk":{"k":0},"sa":{"k":0},"hd":false}]},{"ty":"tr","o":{"k":100},"r":{"k":0},"p":{"k":[0,0]},"a":{"k":[0,0]},"s":{"k":[100,100]},"sk":{"k":0},"sa":{"k":0},"hd":false}]}]}],"meta":{"g":"LF SVG to Lottie"},"assets":[]}')
   };
   let player;
-  let playerConfig = JSON.parse(window.localStorage.getItem('bpx_player_profile') || '{"media":{"volume":"1","nonzeroVol":"1","autoplay":true}}')
+  let playerConfig = JSON.parse(window.localStorage.getItem('bpx_player_profile') || '{"media":{"volume":"1","nonzeroVol":"1","autoplay":true}}');
+
+
+
+  /** 
+   * ------ dm.proto.js --- start ------
+   **/
+  let decodeDmSegMobileReply;
+  (function () {
+    const decodeDmColorfulType = {
+      0: "NoneType",
+      60001: "VipGradualColor",
+    };
+
+    function _decodeDanmakuAIFlag(bb) {
+      let message = {};
+
+      end_of_message: while (!isAtEnd(bb)) {
+        let tag = readVarint32(bb);
+
+        switch (tag >>> 3) {
+          case 0:
+            break end_of_message;
+
+          // repeated DanmakuFlag dm_flags = 1;
+          case 1: {
+            let limit = pushTemporaryLength(bb);
+            let values = message.dm_flags || (message.dm_flags = []);
+            values.push(_decodeDanmakuFlag(bb));
+            bb.limit = limit;
+            break;
+          }
+
+          default:
+            skipUnknownField(bb, tag & 7);
+        }
+      }
+
+      return message;
+    }
+
+    function _decodeDanmakuElem(bb) {
+      let message = {};
+
+      end_of_message: while (!isAtEnd(bb)) {
+        let tag = readVarint32(bb);
+
+        switch (tag >>> 3) {
+          case 0:
+            break end_of_message;
+
+          // optional int64 id = 1;
+          case 1: {
+            message.id = readVarint64(bb, /* unsigned */ false);
+            break;
+          }
+
+          // optional int32 progress = 2;
+          case 2: {
+            message.progress = readVarint32(bb);
+            break;
+          }
+
+          // optional int32 mode = 3;
+          case 3: {
+            message.mode = readVarint32(bb);
+            break;
+          }
+
+          // optional int32 fontsize = 4;
+          case 4: {
+            message.fontsize = readVarint32(bb);
+            break;
+          }
+
+          // optional uint32 color = 5;
+          case 5: {
+            message.color = readVarint32(bb) >>> 0;
+            break;
+          }
+
+          // optional string midHash = 6;
+          case 6: {
+            message.midHash = readString(bb, readVarint32(bb));
+            break;
+          }
+
+          // optional string content = 7;
+          case 7: {
+            message.content = readString(bb, readVarint32(bb));
+            break;
+          }
+
+          // optional int64 ctime = 8;
+          case 8: {
+            message.ctime = readVarint64(bb, /* unsigned */ false);
+            break;
+          }
+
+          // optional int32 weight = 9;
+          case 9: {
+            message.weight = readVarint32(bb);
+            break;
+          }
+
+          // optional string action = 10;
+          case 10: {
+            message.action = readString(bb, readVarint32(bb));
+            break;
+          }
+
+          // optional int32 pool = 11;
+          case 11: {
+            message.pool = readVarint32(bb);
+            break;
+          }
+
+          // optional string idStr = 12;
+          case 12: {
+            message.idStr = readString(bb, readVarint32(bb));
+            break;
+          }
+
+          // optional int32 attr = 13;
+          case 13: {
+            message.attr = readVarint32(bb);
+            break;
+          }
+
+          // optional string animation = 22;
+          case 22: {
+            message.animation = readString(bb, readVarint32(bb));
+            break;
+          }
+
+          // optional DmColorfulType colorful = 24;
+          case 24: {
+            message.colorful = decodeDmColorfulType[readVarint32(bb)];
+            break;
+          }
+
+          default:
+            skipUnknownField(bb, tag & 7);
+        }
+      }
+
+      return message;
+    }
+
+    function _decodeDanmakuFlag(bb) {
+      let message = {};
+
+      end_of_message: while (!isAtEnd(bb)) {
+        let tag = readVarint32(bb);
+
+        switch (tag >>> 3) {
+          case 0:
+            break end_of_message;
+
+          // optional int64 dmid = 1;
+          case 1: {
+            message.dmid = readVarint64(bb, /* unsigned */ false);
+            break;
+          }
+
+          // optional uint32 flag = 2;
+          case 2: {
+            message.flag = readVarint32(bb) >>> 0;
+            break;
+          }
+
+          default:
+            skipUnknownField(bb, tag & 7);
+        }
+      }
+
+      return message;
+    }
+
+    function _decodeDmColorful(bb) {
+      let message = {};
+
+      end_of_message: while (!isAtEnd(bb)) {
+        let tag = readVarint32(bb);
+
+        switch (tag >>> 3) {
+          case 0:
+            break end_of_message;
+
+          // optional DmColorfulType type = 1;
+          case 1: {
+            message.type = decodeDmColorfulType[readVarint32(bb)];
+            break;
+          }
+
+          // optional string src = 2;
+          case 2: {
+            message.src = readString(bb, readVarint32(bb));
+            break;
+          }
+
+          default:
+            skipUnknownField(bb, tag & 7);
+        }
+      }
+
+      return message;
+    }
+
+    decodeDmSegMobileReply = function (binary) {
+      return _decodeDmSegMobileReply(wrapByteBuffer(binary));
+    }
+
+    function _decodeDmSegMobileReply(bb) {
+      let message = {};
+
+      end_of_message: while (!isAtEnd(bb)) {
+        let tag = readVarint32(bb);
+
+        switch (tag >>> 3) {
+          case 0:
+            break end_of_message;
+
+          // repeated DanmakuElem elems = 1;
+          case 1: {
+            let limit = pushTemporaryLength(bb);
+            let values = message.elems || (message.elems = []);
+            values.push(_decodeDanmakuElem(bb));
+            bb.limit = limit;
+            break;
+          }
+
+          // optional int32 state = 2;
+          case 2: {
+            message.state = readVarint32(bb);
+            break;
+          }
+
+          // optional DanmakuAIFlag ai_flag = 3;
+          case 3: {
+            let limit = pushTemporaryLength(bb);
+            message.ai_flag = _decodeDanmakuAIFlag(bb);
+            bb.limit = limit;
+            break;
+          }
+
+          // repeated DmColorful colorfulSrc = 5;
+          case 5: {
+            let limit = pushTemporaryLength(bb);
+            let values = message.colorfulSrc || (message.colorfulSrc = []);
+            values.push(_decodeDmColorful(bb));
+            bb.limit = limit;
+            break;
+          }
+
+          default:
+            skipUnknownField(bb, tag & 7);
+        }
+      }
+
+      return message;
+    }
+
+    function pushTemporaryLength(bb) {
+      let length = readVarint32(bb);
+      let limit = bb.limit;
+      bb.limit = bb.offset + length;
+      return limit;
+    }
+
+    function skipUnknownField(bb, type) {
+      switch (type) {
+        case 0: while (readByte(bb) & 0x80) { } break;
+        case 2: skip(bb, readVarint32(bb)); break;
+        case 5: skip(bb, 4); break;
+        case 1: skip(bb, 8); break;
+        default: throw new Error("Unimplemented type: " + type);
+      }
+    }
+
+    function wrapByteBuffer(bytes) {
+      return { bytes, offset: 0, limit: bytes.length };
+    }
+
+    function skip(bb, offset) {
+      if (bb.offset + offset > bb.limit) {
+        throw new Error('Skip past limit');
+      }
+      bb.offset += offset;
+    }
+
+    function isAtEnd(bb) {
+      return bb.offset >= bb.limit;
+    }
+
+    function advance(bb, count) {
+      let offset = bb.offset;
+      if (offset + count > bb.limit) {
+        throw new Error('Read past limit');
+      }
+      bb.offset += count;
+      return offset;
+    }
+
+    function readString(bb, count) {
+      // Sadly a hand-coded UTF8 decoder is much faster than subarray+TextDecoder in V8
+      let offset = advance(bb, count);
+      let fromCharCode = String.fromCharCode;
+      let bytes = bb.bytes;
+      let invalid = '\uFFFD';
+      let text = '';
+      for (let i = 0; i < count; i++) {
+        let c1 = bytes[i + offset], c2, c3, c4, c;
+        // 1 byte
+        if ((c1 & 0x80) === 0) {
+          text += fromCharCode(c1);
+        }
+        // 2 bytes
+        else if ((c1 & 0xE0) === 0xC0) {
+          if (i + 1 >= count) text += invalid;
+          else {
+            c2 = bytes[i + offset + 1];
+            if ((c2 & 0xC0) !== 0x80) text += invalid;
+            else {
+              c = ((c1 & 0x1F) << 6) | (c2 & 0x3F);
+              if (c < 0x80) text += invalid;
+              else {
+                text += fromCharCode(c);
+                i++;
+              }
+            }
+          }
+        }
+        // 3 bytes
+        else if ((c1 & 0xF0) == 0xE0) {
+          if (i + 2 >= count) text += invalid;
+          else {
+            c2 = bytes[i + offset + 1];
+            c3 = bytes[i + offset + 2];
+            if (((c2 | (c3 << 8)) & 0xC0C0) !== 0x8080) text += invalid;
+            else {
+              c = ((c1 & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F);
+              if (c < 0x0800 || (c >= 0xD800 && c <= 0xDFFF)) text += invalid;
+              else {
+                text += fromCharCode(c);
+                i += 2;
+              }
+            }
+          }
+        }
+        // 4 bytes
+        else if ((c1 & 0xF8) == 0xF0) {
+          if (i + 3 >= count) text += invalid;
+          else {
+            c2 = bytes[i + offset + 1];
+            c3 = bytes[i + offset + 2];
+            c4 = bytes[i + offset + 3];
+            if (((c2 | (c3 << 8) | (c4 << 16)) & 0xC0C0C0) !== 0x808080) text += invalid;
+            else {
+              c = ((c1 & 0x07) << 0x12) | ((c2 & 0x3F) << 0x0C) | ((c3 & 0x3F) << 0x06) | (c4 & 0x3F);
+              if (c < 0x10000 || c > 0x10FFFF) text += invalid;
+              else {
+                c -= 0x10000;
+                text += fromCharCode((c >> 10) + 0xD800, (c & 0x3FF) + 0xDC00);
+                i += 3;
+              }
+            }
+          }
+        }
+        else text += invalid;
+      }
+      return text;
+    }
+
+    function readByte(bb) {
+      return bb.bytes[advance(bb, 1)];
+    }
+
+    function readVarint32(bb) {
+      let c = 0;
+      let value = 0;
+      let b;
+      do {
+        b = readByte(bb);
+        if (c < 32) value |= (b & 0x7F) << c;
+        c += 7;
+      } while (b & 0x80);
+      return value;
+    }
+
+    function readVarint64(bb, unsigned) {
+      let part0 = 0;
+      let part1 = 0;
+      let part2 = 0;
+      let b;
+
+      b = readByte(bb); part0 = (b & 0x7F); if (b & 0x80) {
+        b = readByte(bb); part0 |= (b & 0x7F) << 7; if (b & 0x80) {
+          b = readByte(bb); part0 |= (b & 0x7F) << 14; if (b & 0x80) {
+            b = readByte(bb); part0 |= (b & 0x7F) << 21; if (b & 0x80) {
+              b = readByte(bb); part1 = (b & 0x7F); if (b & 0x80) {
+                b = readByte(bb); part1 |= (b & 0x7F) << 7; if (b & 0x80) {
+                  b = readByte(bb); part1 |= (b & 0x7F) << 14; if (b & 0x80) {
+                    b = readByte(bb); part1 |= (b & 0x7F) << 21; if (b & 0x80) {
+                      b = readByte(bb); part2 = (b & 0x7F); if (b & 0x80) {
+                        b = readByte(bb); part2 |= (b & 0x7F) << 7;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      return {
+        low: part0 | (part1 << 28),
+        high: (part1 >>> 4) | (part2 << 24),
+        unsigned,
+      };
+    }
+  })();
+  /** 
+   * ------ dm.proto.js ---  end  ------
+   **/
 })();
