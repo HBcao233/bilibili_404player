@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 404 刷视频
 // @namespace    http://tampermonkey.net/
-// @version      2025.01.02.1
+// @version      2025.01.02.2
 // @description  在 Bilibili 404页面刷视频
 // @author       HBcao233
 // @match        http*://*.bilibili.com/*
@@ -1894,6 +1894,7 @@
     }
 
     danmaku_reset_state() {
+      this.playerElement.querySelector('.bpx-player-row-dm-wrap').innerHTML = '';
       this.#danmaku_offset = 0;
       this.#danmaku_rolls = [-1, -1, -1, -1, -1, -1, -1, -1];
       this.#danmaku_tops = [-1, -1, -1, -1, -1, -1, -1, -1];
