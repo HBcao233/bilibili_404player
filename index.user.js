@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 404 刷视频
 // @namespace    http://tampermonkey.net/
-// @version      2025.01.01.1
+// @version      2025.01.02.0
 // @description  在 Bilibili 404页面刷视频
 // @author       HBcao233
 // @match        http*://*.bilibili.com/*
@@ -1249,6 +1249,9 @@
     #video_url = '';
     #audio_url = '';
     #lastPauseTimer = null;
+    #danmaku_offset = 0;
+    #danmaku_rolls = [-1, -1, -1, -1, -1, -1, -1, -1];
+    #danmaku_tops = [-1, -1, -1, -1, -1, -1, -1, -1];
 
     // 进度条被按下
     progress_is_mousedown = false;
@@ -1354,17 +1357,8 @@
         record_history(this.video_info.aid, this.video_info.cid, this.currentTime);
       }
 
-      if (!this.video_info.danmakus) this.video_info.danmakus = [];
-      if (Math.abs(this.currentTime - (this.video_info.lastDanmakuTime || -350)) >= 350) {
-        this.video_info.lastDanmakuTime = this.currentTime;
-        get_danmaku(this.video_info.aid, this.video_info.cid, this.currentTime + 10).then((r) => {
-          if (!r.elems || r.elems.length == 0) return;
-          const elems = r.elems.sort((a, b) => a.progress - b.progress);
-          console.log('new danmakus', elems)
-          for (const e of elems) {
-            this.video_info.danmakus.push(e);
-          }
-        })
+      if (this.currentTime - (this.video_info.lastDanmakuTime || 0) >= 350) {
+        this.add_danmakus();
       }
 
       for (let i = (this.danmaku_offset || 0); i < this.video_info.danmakus.length; i++) {
@@ -1378,18 +1372,34 @@
       }
     }
 
-    load_danmaku = (function () {
-      let rolls = [-1, -1, -1, -1, -1, -1, -1, -1];
-      let tops = [-1, -1, -1, -1, -1, -1, -1, -1];
-      return function (danmaku) {
+    danmaku_reset_state() {
+      this.#danmaku_offset = 0;
+      this.#danmaku_rolls = [-1, -1, -1, -1, -1, -1, -1, -1];
+      this.#danmaku_tops = [-1, -1, -1, -1, -1, -1, -1, -1];
+    }
+    add_danmakus(t) {
+      this.video_info.lastDanmakuTime = t;
+      get_danmaku(this.video_info.aid, this.video_info.cid, t + 10).then((r) => {
+        if (!r.elems || r.elems.length == 0) return;
+        const elems = r.elems.sort((a, b) => a.progress - b.progress);
+        console.log('new danmakus', elems)
+        for (const e of elems) {
+          this.video_info.danmakus.push(e);
+        }
+      })
+    }
+    load_danmaku(danmaku) {
         if (
           danmaku.mode < 4 &&
-          (rolls.reduce((num, value) => {
+        (
+          (this.#danmaku_rolls.reduce((num, value) => {
             return value === -1 ? num + 1 : num;
           }, 0) <= 0) ||
-          (tops.reduce((num, value) => {
+          (this.#danmaku_tops.reduce((num, value) => {
             return value === -1 ? num + 1 : num;
-          }, 0) <= 0)
+          }, 0) <= 0) ||
+          player.paused
+        )
         ) {
           setTimeout(() => this.load_danmaku(danmaku), 200);
           return
@@ -1416,8 +1426,8 @@
             t = null;
             break;
           case 5: // 顶部弹幕
-            t.top_index = tops.indexOf(-1);
-            tops[t.top_index] = 0;
+          t.top_index = this.#danmaku_tops.indexOf(-1);
+          this.#danmaku_tops[t.top_index] = 0;
 
             t.classList.add('bili-danmaku-x-center');
             t.style.setProperty('--translateY', t.top_index * danmaku.fontsize + 'px');
@@ -1426,31 +1436,31 @@
             t = null;
             break;
           default: // 普通弹幕
-            t.roll_index = rolls.indexOf(-1);
+          t.roll_index = this.#danmaku_rolls.indexOf(-1);
             let rand;
-            while (rolls.indexOf((rand = Math.floor(Math.random() * 8) * danmaku.fontsize)) !== -1) { }
-            rolls[t.roll_index] = rand;
+          while (this.#danmaku_rolls.indexOf((rand = Math.floor(Math.random() * 8) * danmaku.fontsize)) !== -1) { }
+          this.#danmaku_rolls[t.roll_index] = rand;
 
             t.classList.add('bili-danmaku-x-roll');
             t.style.setProperty('--top', rand + 'px');
-            t.style.setProperty('--translateX', '-979px');
         }
         if (t && !this.playerElement.querySelector(`.bili-danmaku-x-dm[data-id="${danmaku.idStr}"]`)) {
           t.addEventListener('animationend', () => {
             if (t.top_index >= 0) {
-              tops[t.top_index] = -1;
+            this.#danmaku_tops[t.top_index] = -1;
             }
             t.remove()
           });
           this.playerElement.querySelector('.bpx-player-row-dm-wrap').appendChild(t);
           if (t.roll_index >= 0) {
+          t.style.setProperty('--translateX', '-' + (this.playerElement.clientWidth + t.clientWidth) + 'px');
             setTimeout(() => {
-              rolls[t.roll_index] = -1;
-            }, 40 * t.clientWidth);
+            this.#danmaku_rolls[t.roll_index] = -1;
+          }, 60 * t.clientWidth);
           }
         }
       }
-    })();
+
 
     /**
      * 视频播放/暂停
@@ -1753,9 +1763,9 @@
       if (this.has_audio) this.audioElement.currentTime = c;
       this.videoElement.currentTime = c;
 
-      for (let i = (this.danmaku_offset || 0); i < this.video_info.danmakus.length; i++) {
+      for (let i = (this.#danmaku_offset); i < this.video_info.danmakus.length; i++) {
         if (this.video_info.danmakus[i].progress > c * 1000) {
-          this.danmaku_offset = i - 1 > 0 ? i - 1 : 0;
+          this.#danmaku_offset = i - 1 > 0 ? i - 1 : 0;
           break;
         }
       }
@@ -1807,13 +1817,14 @@
      * @param {Object} video 
      */
     setVideo(video) {
-      this.danmaku_offset = 0;
-
       this.audioElement.canplay = 0;
       this.videoElement.canplay = 0;
 
       this.video_info = video;
       this.video_info.lastRecordTime = 0;
+      if (this.video_info.danmakus === undefined) this.video_info.danmakus = [];
+      this.add_danmakus(0);
+      this.danmaku_reset_state();
       const urls = chooseQuality(video);
       this.video_url = urls[0];
       this.audio_url = urls[1];
