@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 404 刷视频
 // @namespace    http://tampermonkey.net/
-// @version      2025.01.02.2
+// @version      2025.01.02.3
 // @description  在 Bilibili 404页面刷视频
 // @author       HBcao233
 // @match        http*://*.bilibili.com/*
@@ -986,7 +986,7 @@
     let split = this.split(sep);
     return maxsplit ? [split.slice(0, -maxsplit).join(sep)].concat(split.slice(-maxsplit)) : split;
   }
-  String.prototype.md5 = function () { let d = this; let r = M(V(Y(X(d), 8 * d.length))); return r.toLowerCase() }; function M(d) { for (var _, m = "0123456789ABCDEF", f = "", r = 0; r < d.length; r++)_ = d.charCodeAt(r), f += m.charAt(_ >>> 4 & 15) + m.charAt(15 & _); return f } function X(d) { for (var _ = Array(d.length >> 2), m = 0; m < _.length; m++)_[m] = 0; for (m = 0; m < 8 * d.length; m += 8)_[m >> 5] |= (255 & d.charCodeAt(m / 8)) << m % 32; return _ } function V(d) { for (var _ = "", m = 0; m < 32 * d.length; m += 8)_ += String.fromCharCode(d[m >> 5] >>> m % 32 & 255); return _ } function Y(d, _) { d[_ >> 5] |= 128 << _ % 32, d[14 + (_ + 64 >>> 9 << 4)] = _; for (var m = 1732584193, f = -271733879, r = -1732584194, i = 271733878, n = 0; n < d.length; n += 16) { var h = m, t = f, g = r, e = i; f = md5_ii(f = md5_ii(f = md5_ii(f = md5_ii(f = md5_hh(f = md5_hh(f = md5_hh(f = md5_hh(f = md5_gg(f = md5_gg(f = md5_gg(f = md5_gg(f = md5_ff(f = md5_ff(f = md5_ff(f = md5_ff(f, r = md5_ff(r, i = md5_ff(i, m = md5_ff(m, f, r, i, d[n + 0], 7, -680876936), f, r, d[n + 1], 12, -389564586), m, f, d[n + 2], 17, 606105819), i, m, d[n + 3], 22, -1044525330), r = md5_ff(r, i = md5_ff(i, m = md5_ff(m, f, r, i, d[n + 4], 7, -176418897), f, r, d[n + 5], 12, 1200080426), m, f, d[n + 6], 17, -1473231341), i, m, d[n + 7], 22, -45705983), r = md5_ff(r, i = md5_ff(i, m = md5_ff(m, f, r, i, d[n + 8], 7, 1770035416), f, r, d[n + 9], 12, -1958414417), m, f, d[n + 10], 17, -42063), i, m, d[n + 11], 22, -1990404162), r = md5_ff(r, i = md5_ff(i, m = md5_ff(m, f, r, i, d[n + 12], 7, 1804603682), f, r, d[n + 13], 12, -40341101), m, f, d[n + 14], 17, -1502002290), i, m, d[n + 15], 22, 1236535329), r = md5_gg(r, i = md5_gg(i, m = md5_gg(m, f, r, i, d[n + 1], 5, -165796510), f, r, d[n + 6], 9, -1069501632), m, f, d[n + 11], 14, 643717713), i, m, d[n + 0], 20, -373897302), r = md5_gg(r, i = md5_gg(i, m = md5_gg(m, f, r, i, d[n + 5], 5, -701558691), f, r, d[n + 10], 9, 38016083), m, f, d[n + 15], 14, -660478335), i, m, d[n + 4], 20, -405537848), r = md5_gg(r, i = md5_gg(i, m = md5_gg(m, f, r, i, d[n + 9], 5, 568446438), f, r, d[n + 14], 9, -1019803690), m, f, d[n + 3], 14, -187363961), i, m, d[n + 8], 20, 1163531501), r = md5_gg(r, i = md5_gg(i, m = md5_gg(m, f, r, i, d[n + 13], 5, -1444681467), f, r, d[n + 2], 9, -51403784), m, f, d[n + 7], 14, 1735328473), i, m, d[n + 12], 20, -1926607734), r = md5_hh(r, i = md5_hh(i, m = md5_hh(m, f, r, i, d[n + 5], 4, -378558), f, r, d[n + 8], 11, -2022574463), m, f, d[n + 11], 16, 1839030562), i, m, d[n + 14], 23, -35309556), r = md5_hh(r, i = md5_hh(i, m = md5_hh(m, f, r, i, d[n + 1], 4, -1530992060), f, r, d[n + 4], 11, 1272893353), m, f, d[n + 7], 16, -155497632), i, m, d[n + 10], 23, -1094730640), r = md5_hh(r, i = md5_hh(i, m = md5_hh(m, f, r, i, d[n + 13], 4, 681279174), f, r, d[n + 0], 11, -358537222), m, f, d[n + 3], 16, -722521979), i, m, d[n + 6], 23, 76029189), r = md5_hh(r, i = md5_hh(i, m = md5_hh(m, f, r, i, d[n + 9], 4, -640364487), f, r, d[n + 12], 11, -421815835), m, f, d[n + 15], 16, 530742520), i, m, d[n + 2], 23, -995338651), r = md5_ii(r, i = md5_ii(i, m = md5_ii(m, f, r, i, d[n + 0], 6, -198630844), f, r, d[n + 7], 10, 1126891415), m, f, d[n + 14], 15, -1416354905), i, m, d[n + 5], 21, -57434055), r = md5_ii(r, i = md5_ii(i, m = md5_ii(m, f, r, i, d[n + 12], 6, 1700485571), f, r, d[n + 3], 10, -1894986606), m, f, d[n + 10], 15, -1051523), i, m, d[n + 1], 21, -2054922799), r = md5_ii(r, i = md5_ii(i, m = md5_ii(m, f, r, i, d[n + 8], 6, 1873313359), f, r, d[n + 15], 10, -30611744), m, f, d[n + 6], 15, -1560198380), i, m, d[n + 13], 21, 1309151649), r = md5_ii(r, i = md5_ii(i, m = md5_ii(m, f, r, i, d[n + 4], 6, -145523070), f, r, d[n + 11], 10, -1120210379), m, f, d[n + 2], 15, 718787259), i, m, d[n + 9], 21, -343485551), m = safe_add(m, h), f = safe_add(f, t), r = safe_add(r, g), i = safe_add(i, e) } return Array(m, f, r, i) } function md5_cmn(d, _, m, f, r, i) { return safe_add(bit_rol(safe_add(safe_add(_, d), safe_add(f, i)), r), m) } function md5_ff(d, _, m, f, r, i, n) { return md5_cmn(_ & m | ~_ & f, d, _, r, i, n) } function md5_gg(d, _, m, f, r, i, n) { return md5_cmn(_ & f | m & ~f, d, _, r, i, n) } function md5_hh(d, _, m, f, r, i, n) { return md5_cmn(_ ^ m ^ f, d, _, r, i, n) } function md5_ii(d, _, m, f, r, i, n) { return md5_cmn(m ^ (_ | ~f), d, _, r, i, n) } function safe_add(d, _) { var m = (65535 & d) + (65535 & _); return (d >> 16) + (_ >> 16) + (m >> 16) << 16 | 65535 & m } function bit_rol(d, _) { return d << _ | d >>> 32 - _ }
+  const md5sum = function (d) { let r = M(V(Y(X(d), 8 * d.length))); return r.toLowerCase() }; function M(d) { for (var _, m = "0123456789ABCDEF", f = "", r = 0; r < d.length; r++)_ = d.charCodeAt(r), f += m.charAt(_ >>> 4 & 15) + m.charAt(15 & _); return f } function X(d) { for (var _ = Array(d.length >> 2), m = 0; m < _.length; m++)_[m] = 0; for (m = 0; m < 8 * d.length; m += 8)_[m >> 5] |= (255 & d.charCodeAt(m / 8)) << m % 32; return _ } function V(d) { for (var _ = "", m = 0; m < 32 * d.length; m += 8)_ += String.fromCharCode(d[m >> 5] >>> m % 32 & 255); return _ } function Y(d, _) { d[_ >> 5] |= 128 << _ % 32, d[14 + (_ + 64 >>> 9 << 4)] = _; for (var m = 1732584193, f = -271733879, r = -1732584194, i = 271733878, n = 0; n < d.length; n += 16) { var h = m, t = f, g = r, e = i; f = md5_ii(f = md5_ii(f = md5_ii(f = md5_ii(f = md5_hh(f = md5_hh(f = md5_hh(f = md5_hh(f = md5_gg(f = md5_gg(f = md5_gg(f = md5_gg(f = md5_ff(f = md5_ff(f = md5_ff(f = md5_ff(f, r = md5_ff(r, i = md5_ff(i, m = md5_ff(m, f, r, i, d[n + 0], 7, -680876936), f, r, d[n + 1], 12, -389564586), m, f, d[n + 2], 17, 606105819), i, m, d[n + 3], 22, -1044525330), r = md5_ff(r, i = md5_ff(i, m = md5_ff(m, f, r, i, d[n + 4], 7, -176418897), f, r, d[n + 5], 12, 1200080426), m, f, d[n + 6], 17, -1473231341), i, m, d[n + 7], 22, -45705983), r = md5_ff(r, i = md5_ff(i, m = md5_ff(m, f, r, i, d[n + 8], 7, 1770035416), f, r, d[n + 9], 12, -1958414417), m, f, d[n + 10], 17, -42063), i, m, d[n + 11], 22, -1990404162), r = md5_ff(r, i = md5_ff(i, m = md5_ff(m, f, r, i, d[n + 12], 7, 1804603682), f, r, d[n + 13], 12, -40341101), m, f, d[n + 14], 17, -1502002290), i, m, d[n + 15], 22, 1236535329), r = md5_gg(r, i = md5_gg(i, m = md5_gg(m, f, r, i, d[n + 1], 5, -165796510), f, r, d[n + 6], 9, -1069501632), m, f, d[n + 11], 14, 643717713), i, m, d[n + 0], 20, -373897302), r = md5_gg(r, i = md5_gg(i, m = md5_gg(m, f, r, i, d[n + 5], 5, -701558691), f, r, d[n + 10], 9, 38016083), m, f, d[n + 15], 14, -660478335), i, m, d[n + 4], 20, -405537848), r = md5_gg(r, i = md5_gg(i, m = md5_gg(m, f, r, i, d[n + 9], 5, 568446438), f, r, d[n + 14], 9, -1019803690), m, f, d[n + 3], 14, -187363961), i, m, d[n + 8], 20, 1163531501), r = md5_gg(r, i = md5_gg(i, m = md5_gg(m, f, r, i, d[n + 13], 5, -1444681467), f, r, d[n + 2], 9, -51403784), m, f, d[n + 7], 14, 1735328473), i, m, d[n + 12], 20, -1926607734), r = md5_hh(r, i = md5_hh(i, m = md5_hh(m, f, r, i, d[n + 5], 4, -378558), f, r, d[n + 8], 11, -2022574463), m, f, d[n + 11], 16, 1839030562), i, m, d[n + 14], 23, -35309556), r = md5_hh(r, i = md5_hh(i, m = md5_hh(m, f, r, i, d[n + 1], 4, -1530992060), f, r, d[n + 4], 11, 1272893353), m, f, d[n + 7], 16, -155497632), i, m, d[n + 10], 23, -1094730640), r = md5_hh(r, i = md5_hh(i, m = md5_hh(m, f, r, i, d[n + 13], 4, 681279174), f, r, d[n + 0], 11, -358537222), m, f, d[n + 3], 16, -722521979), i, m, d[n + 6], 23, 76029189), r = md5_hh(r, i = md5_hh(i, m = md5_hh(m, f, r, i, d[n + 9], 4, -640364487), f, r, d[n + 12], 11, -421815835), m, f, d[n + 15], 16, 530742520), i, m, d[n + 2], 23, -995338651), r = md5_ii(r, i = md5_ii(i, m = md5_ii(m, f, r, i, d[n + 0], 6, -198630844), f, r, d[n + 7], 10, 1126891415), m, f, d[n + 14], 15, -1416354905), i, m, d[n + 5], 21, -57434055), r = md5_ii(r, i = md5_ii(i, m = md5_ii(m, f, r, i, d[n + 12], 6, 1700485571), f, r, d[n + 3], 10, -1894986606), m, f, d[n + 10], 15, -1051523), i, m, d[n + 1], 21, -2054922799), r = md5_ii(r, i = md5_ii(i, m = md5_ii(m, f, r, i, d[n + 8], 6, 1873313359), f, r, d[n + 15], 10, -30611744), m, f, d[n + 6], 15, -1560198380), i, m, d[n + 13], 21, 1309151649), r = md5_ii(r, i = md5_ii(i, m = md5_ii(m, f, r, i, d[n + 4], 6, -145523070), f, r, d[n + 11], 10, -1120210379), m, f, d[n + 2], 15, 718787259), i, m, d[n + 9], 21, -343485551), m = safe_add(m, h), f = safe_add(f, t), r = safe_add(r, g), i = safe_add(i, e) } return Array(m, f, r, i) } function md5_cmn(d, _, m, f, r, i) { return safe_add(bit_rol(safe_add(safe_add(_, d), safe_add(f, i)), r), m) } function md5_ff(d, _, m, f, r, i, n) { return md5_cmn(_ & m | ~_ & f, d, _, r, i, n) } function md5_gg(d, _, m, f, r, i, n) { return md5_cmn(_ & f | m & ~f, d, _, r, i, n) } function md5_hh(d, _, m, f, r, i, n) { return md5_cmn(_ ^ m ^ f, d, _, r, i, n) } function md5_ii(d, _, m, f, r, i, n) { return md5_cmn(m ^ (_ | ~f), d, _, r, i, n) } function safe_add(d, _) { var m = (65535 & d) + (65535 & _); return (d >> 16) + (_ >> 16) + (m >> 16) << 16 | 65535 & m } function bit_rol(d, _) { return d << _ | d >>> 32 - _ }
   const isNumber = s => Object.prototype.toString.call(s) === "[object Number]";
   const isString = s => Object.prototype.toString.call(s) === "[object String]";
   const isArrayLike = s => s != null && typeof s[Symbol.iterator] === 'function';
@@ -1020,28 +1020,28 @@
     return window.screen.width < 500;
   }
 
-  async function getMixinKey() {
-    let mixinKeyEncTab = [46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49, 33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 40, 61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52]
-    const r = await fetch('https://api.bilibili.com/x/web-interface/nav', {
-      credentials: 'include'
-    })
-    const res = (await r.json()).data.wbi_img;
-    const img_key = res['img_url'].rsplit('/', 1)[1].split('.')[0];
-    const sub_key = res['sub_url'].rsplit('/', 1)[1].split('.')[0];
+  async function getMixinKey(img_key, sub_key) {
+    const mixinKeyEncTab = [46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49, 33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 40, 61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52];
+    if (!img_key || !sub_key) {
+      const r = await fetch('https://api.bilibili.com/x/web-interface/nav', {
+        credentials: 'include'
+      })
+      const res = (await r.json()).data.wbi_img;
+      img_key = res['img_url'].rsplit('/', 1)[1].split('.')[0];
+      sub_key = res['sub_url'].rsplit('/', 1)[1].split('.')[0];
+    }
     const orig = img_key + sub_key;
     return mixinKeyEncTab.reduce((s, i) => s + orig[i],).slice(0, 32);
   }
-  function wbi(params) {
-    params['wts'] = (new Date()).getTime();
+  function wbi(params, mkey) {
+    mkey = mkey || mixin_key;
+    params['wts'] = Math.round(Date.now() / 1000);
     // 按照 key 重排参数, 并过滤 value 中的 "!'()*" 字符
-    params = Object.keys(params).sort().reduce((obj, k) => {
-      obj[k] = String(params[k]).replace(/[!'()*]/g, '');
-      return obj;
-    }, {});
-    // 序列化参数
-    let query = (new URLSearchParams(params)).toString();
-    params['w_rid'] = (query + mixin_key).md5();
-    return params
+    const query = Object.keys(params).sort().map(k => {
+      return k + '=' + String(params[k]).replace(/[!'()*]/g, '');
+    }).join('&');
+    params['w_rid'] = md5sum(query + mkey);
+    return params;
   }
 
   async function getPlayerInfo(aid, cid) {
@@ -1096,11 +1096,14 @@
 
   async function getPlayUrl(bvid, cid) {
     const params = wbi({
+      qn: 64,
       fnver: 0,
       fnval: 16,
-      qn: 64,
+      fourk: 1,
+      voice_balance: 1,
       bvid: bvid,
       cid: cid,
+      web_location: 1315873,
     })
     const r = await fetch('https://api.bilibili.com/x/player/wbi/playurl?' + (new URLSearchParams(params)).toString(), {
       credentials: 'include',
@@ -1211,7 +1214,10 @@
   async function getInfo(aid, cid) {
     aid = aid + '';
     const params = {};
-    if (!aid.startsWith('BV')) {
+    if (!aid.startsWith('BV') && !aid.startsWith('bv')) {
+      if (aid.startsWith('av') || aid.startsWith('AV')) {
+        aid = aid.substring(2);
+      }
       params['aid'] = aid;
     } else {
       params['bvid'] = aid;
@@ -1283,6 +1289,8 @@
     const r = await fetch('https://api.bilibili.com/x/v2/history/report', {
       method: 'POST',
       credentials: 'include',
+      withCredentials: true,
+      responseType: "arraybuffer",
       body: new URLSearchParams({
         aid: aid,
         cid: cid,
@@ -1297,32 +1305,32 @@
     return await r.json();
   }
 
-  function get_danmaku(aid, cid, time) {
-    return new Promise((resolve, reject) => {
-      const segment_index = Math.floor(time / 360) + 1;
-      const params = {
-        type: 1,
-        pid: aid,
-        oid: cid,
-        segment_index: segment_index,
-        pull_mode: 1,
-        ps: 0,
-        pe: 120000,
-        web_location: 1315873,
-      }
-      fetch('https://api.bilibili.com/x/v2/dm/web/seg.so?' + (new URLSearchParams(params)).toString(), {
-        credentials: 'include',
-      }).then((r) => {
-        if (r.status != 200) {
-          resolve(r);
-        }
-        return r.arrayBuffer()
-      }).then((res) => {
-        resolve(decodeDmSegMobileReply(new Uint8Array(res)))
-      }).catch((err) => {
-        reject(err);
-      });
+  async function get_danmaku(aid, cid, segment_index, time) {
+    const params = {
+      type: 1,
+      oid: cid,
+      pid: aid,
+      segment_index: segment_index + 1,
+      web_location: 1315873,
+    }
+    // if (segment_index == 0) {
+    //   params['pull_mode'] = 1;
+    //   params['ps'] = 0;
+    //   params['pe'] = 120000;
+    // }
+    const r = await fetch('https://api.bilibili.com/x/v2/dm/web/seg.so?' + (new URLSearchParams(wbi(params))).toString(), {
+      credentials: 'include',
     })
+    if (r.status != 200) {
+      return r;
+    }
+    try {
+      const res = await (r.clone()).json();
+      console.warn(`弹幕包 ${segment_index} 加载失败`)
+      return res;
+    } catch (e) {
+      return { code: 0, data: decodeDmSegMobileReply(new Uint8Array(await r.arrayBuffer())) };
+    }
   }
 
   class Player {
@@ -1877,15 +1885,15 @@
         record_history(this.video_info.aid, this.video_info.cid, this.currentTime);
       }
 
-      if (this.currentTime - (this.video_info.lastDanmakuTime || 0) > 350) {
-        this.video_info.lastDanmakuTime = t;
-        this.add_danmakus();
+      const danmaku_index = Math.floor((this.currentTime - 10) / 360);
+      if (danmaku_index > 0 && !this.video_info.danmakuIndexs[danmaku_index]) {
+        this.add_danmakus(danmaku_index);
       }
 
-      for (let i = (this.danmaku_offset || 0); i < this.video_info.danmakus.length; i++) {
-        if (!this.video_info.danmakus[i].progress) return;
+      for (let i = (this.#danmaku_offset || 0); i < this.video_info.danmakus.length; i++) {
+        if (!this.video_info.danmakus[i].progress) continue;
         if (this.currentTime * 1000 - this.video_info.danmakus[i].progress > 10) {
-          this.danmaku_offset = i + 1;
+          this.#danmaku_offset = i + 1;
           this.load_danmaku(this.video_info.danmakus[i]);
         } else {
           break;
@@ -1893,20 +1901,21 @@
       }
     }
 
-    danmaku_reset_state() {
+    danmaku_reset_state(f) {
+      if (f) this.#danmaku_offset = 0;
       this.playerElement.querySelector('.bpx-player-row-dm-wrap').innerHTML = '';
-      this.#danmaku_offset = 0;
       this.#danmaku_rolls = [-1, -1, -1, -1, -1, -1, -1, -1];
       this.#danmaku_tops = [-1, -1, -1, -1, -1, -1, -1, -1];
     }
-    add_danmakus(t) {
-      get_danmaku(this.video_info.aid, this.video_info.cid, t + 10).then((r) => {
-        if (!r.elems || r.elems.length == 0) return;
-        const elems = r.elems.sort((a, b) => a.progress - b.progress);
-        // console.log('new danmakus', elems)
+    add_danmakus(index) {
+      this.video_info.danmakuIndexs[index] = 1;
+      get_danmaku(this.video_info.aid, this.video_info.cid, index).then((r) => {
+        if (r.code != 0 || !r.data.elems || r.data.elems.length == 0) return;
+        const elems = r.data.elems.sort((a, b) => a.progress - b.progress);
         for (const e of elems) {
           this.video_info.danmakus.push(e);
         }
+        // console.log(this.video_info.danmakus)
       })
     }
     load_danmaku(danmaku) {
@@ -2285,12 +2294,16 @@
       if (this.has_audio) this.audioElement.currentTime = c;
       this.videoElement.currentTime = c;
 
-      for (let i = (this.#danmaku_offset); i < this.video_info.danmakus.length; i++) {
+      this.danmaku_reset_state();
+      let flag = true;
+      for (let i = 0; i < this.video_info.danmakus.length; i++) {
         if (this.video_info.danmakus[i].progress > c * 1000) {
           this.#danmaku_offset = i - 1 > 0 ? i - 1 : 0;
+          flag = false;
           break;
         }
       }
+      if (flag) this.#danmaku_offset = this.video_info.danmakus.length;
     }
 
     /**
@@ -2344,9 +2357,13 @@
 
       this.video_info = video;
       this.video_info.lastRecordTime = 0;
-      if (this.video_info.danmakus === undefined) this.video_info.danmakus = [];
-      this.add_danmakus(0);
-      this.danmaku_reset_state();
+      this.danmaku_reset_state(1);
+      if (this.video_info.danmakus === undefined) {
+        this.video_info.danmakuIndexs = {};
+        this.video_info.danmakus = [];
+        this.add_danmakus(0);
+      }
+
       const urls = chooseQuality(video);
       this.video_url = urls[0];
       this.audio_url = urls[1];
@@ -2939,7 +2956,8 @@
     document.fullscreenElement ? closeFullscreen() : openFullscreen();
   }
 
-  window.addEventListener('load', () => {
+  window.addEventListener('load', async () => {
+    mixin_key = await getMixinKey();
     container = document.querySelector('.error-container');
     if (!container) return;
     document.querySelector("iframe") && document.querySelector("iframe").remove();
@@ -2960,7 +2978,7 @@
   })
 
   let container;
-  let mixin_key = await getMixinKey();
+  let mixin_key;
   let videos = [];
   let videoInfos = {};
   let currentIndex = -1;
