@@ -900,6 +900,19 @@
       animation-play-state: paused !important;
     }
 `
+  /**
+   * 去TM b站各种乱七八糟的报错和后台脚本
+   */
+  for (const e of document.querySelectorAll('script')) {
+    e.remove();
+  }
+  navigator.sendBeacon = function () { };
+  for (const i of ["visibilitychange", "webkitvisibilitychange", "blur"]) {
+    window.addEventListener(i, function (e) {
+      e.stopImmediatePropagation();
+    }, true);
+  }
+
   String.prototype.rsplit = function (sep, maxsplit) {
     let split = this.split(sep);
     return maxsplit ? [split.slice(0, -maxsplit).join(sep)].concat(split.slice(-maxsplit)) : split;
@@ -1389,8 +1402,8 @@
       })
     }
     load_danmaku(danmaku) {
-        if (
-          danmaku.mode < 4 &&
+      if (
+        danmaku.mode < 4 &&
         (
           (this.#danmaku_rolls.reduce((num, value) => {
             return value === -1 ? num + 1 : num;
@@ -1400,66 +1413,66 @@
           }, 0) <= 0) ||
           player.paused
         )
-        ) {
-          setTimeout(() => this.load_danmaku(danmaku), 200);
-          return
-        }
+      ) {
+        setTimeout(() => this.load_danmaku(danmaku), 200);
+        return
+      }
 
-        console.log('load_danmaku', danmaku.mode, danmaku.content);
-        const r = danmaku.color >> 16 & 255;
-        const g = danmaku.color >> 8 & 255;
-        const b = danmaku.color & 255;
-        let t = tag('div', {
-          class: 'bili-danmaku-x-dm',
-          attrs: {
-            'data-id': danmaku.idStr,
-          },
-          innerText: danmaku.content,
-        });
-        t.style.setProperty('--color', `rgb(${r},${g},${b})`);
-        t.style.setProperty('--fontSize', danmaku.fontsize + 'px');
-        switch (danmaku.mode) {
-          case 9: // BAS 弹幕（仅限于特殊弹幕专包）
-          case 8: // 代码弹幕
-          case 7: // 高级弹幕
-          case 6: // 逆向弹幕
-            t = null;
-            break;
-          case 5: // 顶部弹幕
+      console.log('load_danmaku', danmaku.mode, danmaku.content);
+      const r = danmaku.color >> 16 & 255;
+      const g = danmaku.color >> 8 & 255;
+      const b = danmaku.color & 255;
+      let t = tag('div', {
+        class: 'bili-danmaku-x-dm',
+        attrs: {
+          'data-id': danmaku.idStr,
+        },
+        innerText: danmaku.content,
+      });
+      t.style.setProperty('--color', `rgb(${r},${g},${b})`);
+      t.style.setProperty('--fontSize', danmaku.fontsize + 'px');
+      switch (danmaku.mode) {
+        case 9: // BAS 弹幕（仅限于特殊弹幕专包）
+        case 8: // 代码弹幕
+        case 7: // 高级弹幕
+        case 6: // 逆向弹幕
+          t = null;
+          break;
+        case 5: // 顶部弹幕
           t.top_index = this.#danmaku_tops.indexOf(-1);
           this.#danmaku_tops[t.top_index] = 0;
 
-            t.classList.add('bili-danmaku-x-center');
-            t.style.setProperty('--translateY', t.top_index * danmaku.fontsize + 'px');
-            break;
-          case 4: // 底部弹幕
-            t = null;
-            break;
-          default: // 普通弹幕
+          t.classList.add('bili-danmaku-x-center');
+          t.style.setProperty('--translateY', t.top_index * danmaku.fontsize + 'px');
+          break;
+        case 4: // 底部弹幕
+          t = null;
+          break;
+        default: // 普通弹幕
           t.roll_index = this.#danmaku_rolls.indexOf(-1);
-            let rand;
+          let rand;
           while (this.#danmaku_rolls.indexOf((rand = Math.floor(Math.random() * 8) * danmaku.fontsize)) !== -1) { }
           this.#danmaku_rolls[t.roll_index] = rand;
 
-            t.classList.add('bili-danmaku-x-roll');
-            t.style.setProperty('--top', rand + 'px');
-        }
-        if (t && !this.playerElement.querySelector(`.bili-danmaku-x-dm[data-id="${danmaku.idStr}"]`)) {
-          t.addEventListener('animationend', () => {
-            if (t.top_index >= 0) {
+          t.classList.add('bili-danmaku-x-roll');
+          t.style.setProperty('--top', rand + 'px');
+      }
+      if (t && !this.playerElement.querySelector(`.bili-danmaku-x-dm[data-id="${danmaku.idStr}"]`)) {
+        t.addEventListener('animationend', () => {
+          if (t.top_index >= 0) {
             this.#danmaku_tops[t.top_index] = -1;
-            }
-            t.remove()
-          });
-          this.playerElement.querySelector('.bpx-player-row-dm-wrap').appendChild(t);
-          if (t.roll_index >= 0) {
+          }
+          t.remove()
+        });
+        this.playerElement.querySelector('.bpx-player-row-dm-wrap').appendChild(t);
+        if (t.roll_index >= 0) {
           t.style.setProperty('--translateX', '-' + (this.playerElement.clientWidth + t.clientWidth) + 'px');
-            setTimeout(() => {
+          setTimeout(() => {
             this.#danmaku_rolls[t.roll_index] = -1;
           }, 60 * t.clientWidth);
-          }
         }
       }
+    }
 
 
     /**
