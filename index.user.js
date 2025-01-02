@@ -719,11 +719,13 @@
 
     .player-wrap .video-controls {
       display: flex;
+      position: relative;
       flex-direction: column;
       justify-content: center;
       margin-left: 5px;
     }
     .player-wrap .video-controls > .item {
+      position: relative;
       transform: rotate(90deg);
       border-radius: 5px;
       background: var(--text2, #61666D);
@@ -739,6 +741,36 @@
     }
     .player-wrap .video-controls > .item:hover {
       background: var(--brand_blue, #00AEEC);
+    }
+
+    .player-wrap .video-controls > .item.goto {
+      position: absolute;
+      top: 0;
+      transform: unset;
+    }
+    .player-wrap .video-controls > .item.goto .goto-form {
+      display: none;
+      position: absolute;
+      left: 35px;
+      transform: translateY(-7px);
+    }
+    .video-controls .item.goto:hover .goto-form,
+    .video-controls .item.goto.hover .goto-form, 
+    .goto-form:hover {
+      display: block;
+    }
+    .goto-form .goto-input {
+      display: block;
+      width: 120px;
+    }
+    .goto-form .goto-confirm {
+      margin-top: 3px;
+    }
+    .goto-form .goto-tip {
+      font-size: 12px;
+      color: black;
+      font-weight: normal;
+      margin-left: 5px;
     }
 
     .bpx-player-tooltip-area {
@@ -1577,7 +1609,7 @@
                                   i.classList.remove('active');
                                 }
                                 e.target.classList.add('active');
-                                t.querySelector('.text').innerText = x + 'x';
+                                t.querySelector('.text').innerText = (x === '1' ? '倍速' : x + 'x');
                               }
                             });
                           }),
@@ -1845,7 +1877,8 @@
         record_history(this.video_info.aid, this.video_info.cid, this.currentTime);
       }
 
-      if (this.currentTime - (this.video_info.lastDanmakuTime || 0) >= 350) {
+      if (this.currentTime - (this.video_info.lastDanmakuTime || 0) > 350) {
+        this.video_info.lastDanmakuTime = t;
         this.add_danmakus();
       }
 
@@ -1866,7 +1899,6 @@
       this.#danmaku_tops = [-1, -1, -1, -1, -1, -1, -1, -1];
     }
     add_danmakus(t) {
-      this.video_info.lastDanmakuTime = t;
       get_danmaku(this.video_info.aid, this.video_info.cid, t + 10).then((r) => {
         if (!r.elems || r.elems.length == 0) return;
         const elems = r.elems.sort((a, b) => a.progress - b.progress);
@@ -1994,6 +2026,7 @@
        * 监听键盘
        */
       document.addEventListener('keydown', async (e) => {
+        if (e.target.closest('input')) return;
         switch (e.code) {
           case 'F11':
           case 'KeyF':
@@ -2017,6 +2050,7 @@
         }
       })
       document.addEventListener('keyup', async (e) => {
+        if (e.target.closest('input')) return;
         switch (e.code) {
           // 上一条
           case 'BracketLeft':
@@ -2063,7 +2097,7 @@
        */
       this.audioElement.addEventListener('canplay', (e) => this.canplay_wrap(e));
       this.audioElement.addEventListener('ended', () => {
-        nextVideo();
+        nextVideo().then();
       });
       this.audioElement.addEventListener('timeupdate', () => {
         if (!this.has_audio) return;
@@ -2094,7 +2128,7 @@
       });
       this.videoElement.addEventListener('ended', () => {
         if (this.has_audio) return;
-        nextVideo();
+        nextVideo().then();
       });
       this.videoElement.addEventListener('click', () => this.videoClick());
       this.playerElement.querySelector('.control-btn.play').addEventListener('click', () => this.videoClick());
@@ -2570,8 +2604,62 @@
         player.playerElement,
         tag('div', {
           class: 'video-controls', children: [
-            tag('div', { class: 'previous item', attrs: { title: '上一个（[）' }, innerHTML: '<' }, (t) => t.addEventListener('click', previousVideo)),
-            tag('div', { class: 'next item', attrs: { title: '下一个（]）' }, innerHTML: '>' }, (t) => t.addEventListener('click', nextVideo)),
+            tag('div', {
+              class: 'goto item', attrs: { title: 'BV号跳转' }, children: [
+                tag('span', { innerText: 'B' }),
+                tag('form', {
+                  class: 'goto-form', children: [
+                    tag('input', { class: 'goto-input', attrs: { type: 'normal', value: 'BV' } }),
+                    tag('button', { class: 'goto-confirm', attrs: { type: 'button' }, innerText: '→' }),
+                    tag('span', { class: 'goto-tip' }),
+                  ]
+                }),
+              ]
+            }, (t) => {
+              let idx;
+              t.addEventListener('mouseenter', () => {
+                clearTimeout(idx);
+                t.classList.add('hover');
+              })
+              t.addEventListener('mouseleave', () => {
+                idx = setTimeout(() => { t.classList.remove('hover') }, 200);
+              })
+              t.querySelector('.goto-confirm').addEventListener('click', e => {
+                e.preventDefault();
+                t.querySelector('.goto-form').requestSubmit();
+              });
+              t.querySelector('.goto-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const x = e.target.children[0].value;
+                if (x.match(/^(BV|av|bv|AV)/)) {
+                  if (x.match(/^(BV|bv)/) && player.video_info.bvid == x) {
+                    t.querySelector('.goto-tip').innerText = `当前已经在播放 ${x} 了`;
+                    return;
+                  }
+                  if (x.match(/^(av|AV)/) && x.substring(2) == player.video_info.aid + '') {
+                    t.querySelector('.goto-tip').innerText = `当前已经在播放 ${x} 了`;
+                    return;
+                  }
+                  t.querySelector('.goto-tip').innerText = '';
+                  getInfo(x).then((res) => {
+                    videos.splice(currentIndex + 1, 0, {
+                      goto: 'av',
+                      id: res.aid,
+                      cid: res.cid,
+                    })
+                    videoInfos['av_' + res.aid] = res;
+                    nextVideo().then();
+                  }).catch((err) => {
+                    t.querySelector('.goto-tip').innerText = '视频不存在';
+                  })
+                  return;
+                }
+                t.querySelector('.goto-tip').innerText = '必须以BV/av开头';
+              });
+            }),
+
+            tag('div', { class: 'previous item', attrs: { title: '上一个（[）' }, innerText: '<' }, (t) => t.addEventListener('click', previousVideo)),
+            tag('div', { class: 'next item', attrs: { title: '下一个（]）' }, innerText: '>' }, (t) => t.addEventListener('click', nextVideo)),
           ]
         })
       ]
