@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 404 刷视频
 // @namespace    http://tampermonkey.net/
-// @version      2025.01.02.3
+// @version      2025.01.03.0
 // @description  在 Bilibili 404页面刷视频
 // @author       HBcao233
 // @match        http*://*.bilibili.com/*
@@ -331,13 +331,6 @@
       position: absolute;
       width: 100%;
       z-index: 75;
-      opacity: 0;
-      transition: opacity .2s ease-in;
-    }
-    #bilibili-player.hover .bpx-player-control,
-    #bilibili-player:has(.control-btn:hover) .bpx-player-control, 
-    #bilibili-player:has(.bpx-player-progress:hover) .bpx-player-control {
-      opacity: 1;
     }
 
     .bpx-player-control-mask {
@@ -347,9 +340,18 @@
       left: 0;
       pointer-events: none;
       position: absolute;
-      transition: opacity .2s ease-in-out;
       width: 100%;
       z-index: -1;
+      opacity: 0;
+      transition: opacity .2s ease-in;
+    }
+    #bilibili-player.hover .bpx-player-control-mask,
+    #bilibili-player:has(.control-btn:hover) .bpx-player-control-mask,
+    #bilibili-player:has(.bpx-player-progress:hover) .bpx-player-control-mask,
+    #bilibili-player.hover .bpx-player-control-bottom,
+    #bilibili-player:has(.control-btn:hover) .bpx-player-control-bottom, 
+    #bilibili-player:has(.bpx-player-progress:hover) .bpx-player-control-bottom {
+      opacity: 1;
     }
 
     .bpx-player-control-top {
@@ -359,6 +361,9 @@
       bottom: 44px;
       box-sizing: border-box;
       padding: 0 12px;
+    }
+    #bilibili-player:not(.hover) .bpx-player-control-top {
+      bottom: 0;
     }
     .bpx-player-progress {
       margin-bottom: 6px;
@@ -497,8 +502,9 @@
       line-height: 22px;
       margin: 20px 0 0;
       padding: 0 12px;
-      transition: all .2s ease-out;
       width: 100%;
+      opacity: 0;
+      transition: opacity .2s ease-in;
     }
     .bpx-player-control-bottom-left {
       display: inline-flex;
@@ -1901,11 +1907,11 @@
       }
     }
 
-    danmaku_reset_state(f) {
-      if (f) this.#danmaku_offset = 0;
+    danmaku_reset_state() {
       this.playerElement.querySelector('.bpx-player-row-dm-wrap').innerHTML = '';
       this.#danmaku_rolls = [-1, -1, -1, -1, -1, -1, -1, -1];
       this.#danmaku_tops = [-1, -1, -1, -1, -1, -1, -1, -1];
+      this.#danmaku_tasks = [];
     }
     add_danmakus(index) {
       this.video_info.danmakuIndexs[index] = 1;
@@ -1918,6 +1924,7 @@
         // console.log(this.video_info.danmakus)
       })
     }
+    #danmaku_tasks = [];
     load_danmaku(danmaku) {
       if (
         danmaku.mode < 4 &&
@@ -1931,7 +1938,11 @@
           this.paused
         )
       ) {
-        setTimeout(() => this.load_danmaku(danmaku), 200);
+        this.#danmaku_tasks.push(danmaku);
+        setTimeout(() => {
+          if (this.#danmaku_tasks.length == 0) return;
+          this.load_danmaku(this.#danmaku_tasks.shift());
+        }, 200);
         return
       }
 
@@ -2293,7 +2304,6 @@
     set currentTime(c) {
       if (this.has_audio) this.audioElement.currentTime = c;
       this.videoElement.currentTime = c;
-
       this.danmaku_reset_state();
       let flag = true;
       for (let i = 0; i < this.video_info.danmakus.length; i++) {
@@ -2304,6 +2314,10 @@
         }
       }
       if (flag) this.#danmaku_offset = this.video_info.danmakus.length;
+    }
+    get seeking() {
+      if (this.has_audio) return this.audioElement.seeking;
+      return this.videoElement.seeking;
     }
 
     /**
@@ -2357,7 +2371,8 @@
 
       this.video_info = video;
       this.video_info.lastRecordTime = 0;
-      this.danmaku_reset_state(1);
+      this.#danmaku_offset = 0;
+      this.danmaku_reset_state();
       if (this.video_info.danmakus === undefined) {
         this.video_info.danmakuIndexs = {};
         this.video_info.danmakus = [];
@@ -2665,7 +2680,7 @@
                       id: res.aid,
                       cid: res.cid,
                     })
-                    videoInfos['av_' + res.aid] = res;
+                    if (!videoInfos['av_' + res.aid]) videoInfos['av_' + res.aid] = res;
                     nextVideo().then();
                   }).catch((err) => {
                     t.querySelector('.goto-tip').innerText = '视频不存在';
